@@ -259,9 +259,13 @@ function safeSegment(segment) {
   return decoded || '_';
 }
 
-function outputPathForUrl(url, contentType) {
+function outputPathForUrl(url, contentType, base) {
   const u = new URL(url);
   const parts = u.pathname.split('/').filter(Boolean).map(safeSegment);
+
+  if (base && (u.origin !== base.origin || !u.pathname.startsWith(base.pathname))) {
+    parts.unshift('_external', safeSegment(u.hostname));
+  }
   let name = parts.pop() || 'index';
 
   if (u.search) {
@@ -388,7 +392,7 @@ async function crawl(options) {
   const inventory = [];
   const findingMap = {};
 
-  function enqueue(candidate, source) {
+  function enqueue(candidate, source, leaf) {
     let href;
 
     try {
@@ -397,12 +401,13 @@ async function crawl(options) {
       return;
     }
 
-    if (!sameEmulatorScope(href, base)) return;
+    const inScope = sameEmulatorScope(href, base);
+    if (!inScope && !leaf) return;
     if (visited.has(href) || queued.has(href)) return;
     if (DANGEROUS_ROUTE.test(href) && !isStaticSnapshotUrl(href, source)) return;
 
     queued.add(href);
-    queue.push({ url: href, source: source || 'discovered' });
+    queue.push({ url: href, source: source || 'discovered', leaf: Boolean(leaf && !inScope) });
   }
 
   enqueue(start, 'seed');
@@ -422,7 +427,10 @@ async function crawl(options) {
     let response;
 
     try {
-      response = await requestBuffer(item.url, settings, 0);
+      const requestSettings = item.leaf
+        ? Object.assign({}, settings, { base: new URL('/', new URL(item.url).origin) })
+        : settings;
+      response = await requestBuffer(item.url, requestSettings, 0);
     } catch (err) {
       inventory.push({
         url: item.url,
@@ -442,7 +450,7 @@ async function crawl(options) {
 
     const contentType = String(response.headers['content-type'] || '');
     const declared = String(response.headers['content-length'] || '');
-    const rel = outputPathForUrl(item.url, contentType);
+    const rel = outputPathForUrl(item.url, contentType, base);
     const out = path.join(rawRoot, rel);
 
     await fsp.mkdir(path.dirname(out), { recursive: true });
@@ -469,7 +477,7 @@ async function crawl(options) {
     const textual = /^text\//i.test(contentType) ||
       /(?:html|json|javascript|css|xml)/i.test(contentType);
 
-    if (!textual) {
+    if (!textual || item.leaf) {
       await sleep(settings.delayMs);
       continue;
     }
@@ -480,7 +488,9 @@ async function crawl(options) {
 
     const refs = extractReferences(text, contentType, item.url, base);
 
-    refs.urls.forEach((url) => enqueue(url, 'asset:' + item.url));
+    refs.urls.forEach((url) => {
+      enqueue(url, 'asset:' + item.url, !sameEmulatorScope(url, base));
+    });
 
     refs.routes.forEach((route) => {
       allRoutes.add(route);
@@ -550,7 +560,8 @@ async function crawl(options) {
       },
       safety: {
         method: 'GET only',
-        same_emulator_subtree_only: true,
+        recursive_scope: 'selected emulator subtree',
+        directly_referenced_external_dependencies_saved_as_leaves: true,
         live_destructive_routes_skipped_but_static_snapshots_kept: true,
         no_asset_type_filtering: true,
         no_default_request_cap: true,
