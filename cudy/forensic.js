@@ -327,6 +327,17 @@ function outputPathForUrl(url, contentType, base) {
   return path.join.apply(path, parts.concat(name));
 }
 
+function disambiguateOutputPath(rel, url, attempt) {
+  attempt = attempt || 0;
+  const ext = path.extname(rel);
+  const stem = ext ? rel.slice(0, -ext.length) : rel;
+  const hash = crypto.createHash('sha1')
+    .update(String(url) + (attempt ? ':' + attempt : ''))
+    .digest('hex')
+    .slice(0, 12);
+  return stem + '__u_' + hash + ext;
+}
+
 function csvEscape(value) {
   const s = String(value == null ? '' : value);
   if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
@@ -435,12 +446,16 @@ async function crawl(options) {
   const unresolved = new Set();
   const inventory = [];
   const findingMap = {};
+  const savedPathOwners = new Map();
 
   function enqueue(candidate, source, leaf) {
     let href;
 
     try {
-      href = new URL(candidate, base).href;
+      const parsed = new URL(candidate, base);
+      // URL fragments are client-side anchors, not distinct HTTP resources.
+      parsed.hash = '';
+      href = parsed.href;
     } catch (_) {
       return;
     }
@@ -502,7 +517,24 @@ async function crawl(options) {
 
     const contentType = String(response.headers['content-type'] || '');
     const declared = String(response.headers['content-length'] || '');
-    const rel = outputPathForUrl(item.url, contentType, base);
+    let rel = outputPathForUrl(item.url, contentType, base);
+
+    // Different public URLs can normalize to the same readable local name
+    // (for example /admin/foo and /admin/foo.html). Never overwrite one
+    // response with another: keep the first readable path and hash-suffix
+    // every colliding URL.
+    let owner = savedPathOwners.get(rel);
+    let collisionAttempt = 0;
+    while (owner && owner !== item.url) {
+      rel = disambiguateOutputPath(
+        outputPathForUrl(item.url, contentType, base),
+        item.url,
+        collisionAttempt++
+      );
+      owner = savedPathOwners.get(rel);
+    }
+    savedPathOwners.set(rel, item.url);
+
     const out = path.join(rawRoot, rel);
 
     await fsp.mkdir(path.dirname(out), { recursive: true });
@@ -510,6 +542,7 @@ async function crawl(options) {
 
     inventory.push({
       url: item.url,
+      final_url: response.finalUrl || item.url,
       status: response.status,
       content_type: contentType,
       content_length: declared,
@@ -568,7 +601,7 @@ async function crawl(options) {
   }
 
   const columns = [
-    'url', 'status', 'content_type', 'content_length',
+    'url', 'final_url', 'status', 'content_type', 'content_length',
     'bytes', 'sha256', 'saved_as', 'source', 'error'
   ];
 
