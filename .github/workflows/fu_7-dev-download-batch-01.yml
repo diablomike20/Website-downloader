@@ -1,0 +1,61 @@
+name: FU_7 Cudy Dev Build Download Batch 01
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-dev-download-batch-01.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download known public Cudy beta/dev artifacts
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p fu_7-dev-builds
+
+          # WR3000 AdBlock beta - official Cudy article links this Google Drive file ID.
+          curl -L --fail --retry 2             'https://drive.usercontent.google.com/download?id=1FjO2JABXSdyY1AXWAjVVje8BYAu8iomt&export=download&confirm=t'             -o fu_7-dev-builds/WR3000-AdBlock-BETA-drive.bin || true
+
+          # First-party exact beta filenames published by Cudy.
+          for f in             LT500-R9-1.15.5beta-20221121-180014-flash.bin             LT450-R9-1.15.5beta-20221121-180014-flash.bin
+          do
+            curl -L --fail --retry 2 "https://www.cudy.com/cdn/shop/files/$f"               -o "fu_7-dev-builds/$f" || true
+          done
+
+          # Official TR3000 256MB DTS + intermediate package.
+          curl -L --fail --retry 2             'https://www.cudy.com/cdn/shop/files/DTS_and_intermediate_firmware_b766f42b-5e1c-4ad5-85b2-53990a85a956.zip'             -o fu_7-dev-builds/DTS_and_intermediate_firmware_b766f42b-5e1c-4ad5-85b2-53990a85a956.zip || true
+
+          # Remove HTML/error bodies and make manifest.
+          python3 - <<'PY'
+          import os,hashlib,json
+          root='fu_7-dev-builds'
+          rows=[]
+          for fn in sorted(os.listdir(root)):
+              p=os.path.join(root,fn)
+              data=open(p,'rb').read()
+              if data[:1000].lstrip().lower().startswith((b'<!doctype html',b'<html')):
+                  os.remove(p)
+                  continue
+              rows.append({
+                'filename':fn,
+                'size':len(data),
+                'sha256':hashlib.sha256(data).hexdigest()
+              })
+          open('fu_7-DEV-BUILD-BATCH-01-MANIFEST.json','w').write(json.dumps(rows,indent=2))
+          print(json.dumps(rows,indent=2))
+          PY
+
+      - name: Upload builds
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-CUDY-DEV-BUILD-BATCH-01
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            fu_7-dev-builds/*
+            fu_7-DEV-BUILD-BATCH-01-MANIFEST.json
