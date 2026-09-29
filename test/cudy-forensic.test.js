@@ -108,3 +108,22 @@ run('discovers HTML-escaped modal actions such as Backup and SSH', function () {
     true
   );
 });
+
+
+run('discovers model-prefixed legacy LuCI route strings', function () {
+  const page = 'https://support.cudy.com/emulator/LT500/cgi-bin/luci/admin/setup';
+  const base = emulatorBaseFromUrl(page);
+  const html = '<script>var u="/emulator/LT500/cgi-bin/luci/admin/system/backup";</script>';
+
+  const refs = require('../cudy/forensic').extractReferences(
+    html,
+    'text/html; charset=utf-8',
+    page,
+    base
+  );
+
+  assert.strictEqual(
+    refs.routes.has('https://support.cudy.com/emulator/LT500/cgi-bin/luci/admin/system/backup'),
+    true
+  );
+});
