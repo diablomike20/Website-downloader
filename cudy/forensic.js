@@ -573,8 +573,95 @@ async function crawl(options) {
   };
 }
 
+async function discoverEmulatorModels(indexUrl, options) {
+  const index = new URL(indexUrl || 'https://support.cudy.com/');
+  const requestOptions = {
+    base: new URL('/', index.origin),
+    maxBytes: unlimitedNumber(options && options.maxBytes),
+    timeoutMs: unlimitedNumber(options && options.timeoutMs),
+    userAgent: (options && options.userAgent) || 'fu_6-cudy-emulator-forensic-downloader/0.1'
+  };
+
+  const response = await requestBuffer(index.href, requestOptions, 0);
+  const text = response.body.toString('utf8');
+  const models = new Set();
+  const re = /(?:https?:\/\/support\.cudy\.com)?\/emulator\/([^/"'?&#<>]+)\//gi;
+  let match;
+
+  while ((match = re.exec(text))) {
+    models.add(decodeURIComponent(match[1]));
+  }
+
+  return Array.from(models).sort();
+}
+
+async function crawlAllEmulators(options) {
+  options = options || {};
+  const indexUrl = options.indexUrl || 'https://support.cudy.com/';
+  const outputRoot = path.resolve(options.output || 'cudy-forensic-output');
+  const models = await discoverEmulatorModels(indexUrl, options);
+  const results = [];
+
+  await fsp.mkdir(outputRoot, { recursive: true });
+
+  for (const model of models) {
+    if (typeof options.shouldCancel === 'function' && options.shouldCancel()) break;
+
+    const result = await crawl({
+      url: new URL('/emulator/' + encodeURIComponent(model) + '/', new URL(indexUrl).origin).href,
+      output: path.join(outputRoot, model),
+      maxBytes: options.maxBytes,
+      maxRequests: options.maxRequests,
+      delayMs: options.delayMs,
+      timeoutMs: options.timeoutMs,
+      userAgent: options.userAgent,
+      shouldCancel: options.shouldCancel
+    });
+
+    results.push(result);
+  }
+
+  const summary = results.map((r) => ({
+    model: r.model,
+    visited: r.visited,
+    routes: r.routes,
+    unresolved: r.unresolved,
+    output_root: r.outputRoot
+  }));
+
+  await fsp.writeFile(
+    path.join(outputRoot, 'fu_6-models.json'),
+    JSON.stringify(summary, null, 2) + '\n'
+  );
+
+  const routeMaster = new Set();
+  for (const result of results) {
+    try {
+      const routes = await fsp.readFile(
+        path.join(result.outputRoot, 'fu_6-all-luci-routes.txt'),
+        'utf8'
+      );
+      routes.split(/\r?\n/).filter(Boolean).forEach((r) => routeMaster.add(r));
+    } catch (_) {}
+  }
+
+  await fsp.writeFile(
+    path.join(outputRoot, 'fu_6-routes-master.txt'),
+    Array.from(routeMaster).sort().join('\n') + '\n'
+  );
+
+  return {
+    outputRoot,
+    models: models.length,
+    completed: results.length,
+    results: summary
+  };
+}
+
 module.exports = {
   crawl,
+  crawlAllEmulators,
+  discoverEmulatorModels,
   mapQueryPath,
   emulatorBaseFromUrl,
   sameEmulatorScope,
