@@ -63,6 +63,20 @@ npm run cudy-forensic -- \
 
 A value of `0` (the default) means unlimited/no artificial limit for request count, response size and timeout.
 
+To capture **every emulator currently listed by the Cudy support index**, with the same exhaustive defaults:
+
+```bash
+npm run cudy-forensic -- --all
+```
+
+Or choose an archive root:
+
+```bash
+npm run cudy-forensic -- --all --output cudy-forensic-output
+```
+
+This creates one full capture per model plus `fu_6-models.json` and a cross-model `fu_6-routes-master.txt`.
+
 The output contains:
 
 ```text
