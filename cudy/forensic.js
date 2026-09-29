@@ -14,7 +14,8 @@ const DROP_QUERY_KEYS = new Set([
 
 const SKIP_EXT = /\.(?:woff2?|ttf|eot|ico|mp4|webm|mp3|wav)$/i;
 const DANGEROUS_ROUTE = /(?:\/logout|\/reboot|\/reset|\/forget|\/revert|batchupgrade|batchadopt|\/gcom\/search)(?:[/?]|$)/i;
-const ATTR_RE = /\b(?:href|src|action)\s*=\s*["']([^"']+)["']/gi;
+const ATTR_RE = /<[^>]+\b(?:href|src|action)\s*=\s*["']([^"']+)["'][^>]*>/gi;
+const HTML_BASE_RE = /<base\s+[^>]*href\s*=\s*["']([^"']+)["'][^>]*>/i;
 const CSS_URL_RE = /url\(\s*["']?([^"')]+)["']?\s*\)/gi;
 const LUCI_RE = /["'`](\/?(?:cgi-bin\/luci|admin)\/[A-Za-z0-9_./%?=&:+-]+)["'`]/g;
 const STATIC_RE = /["'`](\.\/?cgi-bin\/luci\/[A-Za-z0-9_./%?=&:+-]+\.html)["'`]/g;
@@ -162,8 +163,16 @@ function extractReferences(text, contentType, pageUrl, base) {
 
   if (!textual) return { urls, routes, mapped };
 
+  let documentBase = pageUrl;
+  if (/html/i.test(contentType)) {
+    const baseMatch = HTML_BASE_RE.exec(text);
+    if (baseMatch) {
+      try { documentBase = new URL(baseMatch[1], pageUrl).href; } catch (_) {}
+    }
+  }
+
   const addUrl = (raw) => {
-    const resolved = resolveCandidate(raw, pageUrl, base);
+    const resolved = resolveCandidate(raw, documentBase, base);
     if (resolved) urls.add(resolved);
   };
 
