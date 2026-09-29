@@ -82,3 +82,29 @@ run('scope lock stays inside one emulator model', function () {
 });
 
 console.log('fu_6 Cudy forensic mapper tests complete.');
+
+
+run('discovers HTML-escaped modal actions such as Backup and SSH', function () {
+  const page = 'https://support.cudy.com/emulator/C200P/cgi-bin/luci/admin/panel.html';
+  const base = emulatorBaseFromUrl(page);
+  const html = [
+    '<button onclick="cbi_show_modal(&quot;#cbi-modal&quot;, &quot;/cgi-bin/luci/admin/system/backup&quot;, &quot;&quot;, &quot;&quot;);return false">Backup</button>',
+    '<button onclick="cbi_show_modal(&quot;#cbi-modal&quot;, &quot;/cgi-bin/luci/admin/system/ssh&quot;, &quot;&quot;, &quot;&quot;);return false">SSH</button>'
+  ].join('');
+
+  const refs = require('../cudy/forensic').extractReferences(
+    html,
+    'text/html; charset=utf-8',
+    page,
+    base
+  );
+
+  assert.strictEqual(
+    refs.routes.has('https://support.cudy.com/emulator/C200P/cgi-bin/luci/admin/system/backup'),
+    true
+  );
+  assert.strictEqual(
+    refs.routes.has('https://support.cudy.com/emulator/C200P/cgi-bin/luci/admin/system/ssh'),
+    true
+  );
+});
