@@ -186,6 +186,8 @@ function extractReferences(text, contentType, pageUrl, base) {
 
   if (!textual) return { urls, routes, mapped };
 
+  const scanText = /html/i.test(contentType) ? decodeHtmlForDiscovery(text) : text;
+
   let documentBase = pageUrl;
   if (/html/i.test(contentType)) {
     const baseMatch = HTML_BASE_RE.exec(scanText);
