@@ -386,6 +386,10 @@ async function crawl(options) {
   enqueue(base.href, 'emulator-root');
 
   while (queue.length && visited.size < settings.maxRequests) {
+    if (typeof options.shouldCancel === 'function' && options.shouldCancel()) {
+      break;
+    }
+
     const item = queue.shift();
     queued.delete(item.url);
 
@@ -470,6 +474,10 @@ async function crawl(options) {
     });
 
     refs.mapped.forEach((url) => enqueue(url, 'static-map:' + item.url));
+
+    if (typeof options.shouldCancel === 'function' && options.shouldCancel()) {
+      break;
+    }
 
     await sleep(settings.delayMs);
   }
