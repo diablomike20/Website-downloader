@@ -17,6 +17,7 @@ const ATTR_RE = /<[^>]+\b(?:href|src|action)\s*=\s*["']([^"']+)["'][^>]*>/gi;
 const HTML_BASE_RE = /<base\s+[^>]*href\s*=\s*["']([^"']+)["'][^>]*>/i;
 const CSS_URL_RE = /url\(\s*["']?([^"')]+)["']?\s*\)/gi;
 const LUCI_RE = /["'`](\/?(?:cgi-bin\/luci|admin)\/[A-Za-z0-9_./%?=&:+-]+)["'`]/g;
+const ABSOLUTE_LUCI_RE = /(?:https?:\/\/[^\s"'<>]+)?(?:\/emulator\/[^\s"'<>/]+)?\/cgi-bin\/luci\/[A-Za-z0-9_./%?=&:+-]+/gi;
 const STATIC_RE = /["'`](\.\/?cgi-bin\/luci\/[A-Za-z0-9_./%?=&:+-]+\.html)["'`]/g;
 const JQ_POST_RE = /\$\.post\(\s*["'`]([^"'`]+)["'`]\s*,\s*\{([^}]*)\}/g;
 const SIMPLE_PAIR_RE = /([A-Za-z0-9_.-]+)\s*:\s*["'`]([^"'`]*)["'`]/g;
@@ -231,6 +232,20 @@ function extractReferences(text, contentType, pageUrl, base) {
   LUCI_RE.lastIndex = 0;
   while ((match = LUCI_RE.exec(scanText))) {
     const route = normalizeLuciUrl(match[1], pageUrl, base);
+    if (!route) continue;
+
+    routes.add(route);
+
+    const staticUrl = toStaticEmulatorUrl(route, pageUrl, base);
+    if (staticUrl) mapped.add(staticUrl);
+  }
+
+  // Legacy emulator pages frequently embed full model-prefixed paths such as
+  // /emulator/LT500/cgi-bin/luci/admin/... inside JavaScript and modal data,
+  // not in normal href/src attributes. Capture those too.
+  ABSOLUTE_LUCI_RE.lastIndex = 0;
+  while ((match = ABSOLUTE_LUCI_RE.exec(scanText))) {
+    const route = normalizeLuciUrl(match[0], pageUrl, base);
     if (!route) continue;
 
     routes.add(route);
