@@ -1,0 +1,32 @@
+name: FU_7 LT500 Support Delivery Hunt
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - "scripts/fu_7_lt500_support_delivery_hunt.py"
+      - ".github/workflows/fu_7-lt500-support-delivery-hunt.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan comments for LT500 private firmware delivery traces
+        run: python3 scripts/fu_7_lt500_support_delivery_hunt.py
+      - name: Summary
+        if: always()
+        run: cat fu_7-LT500-SUPPORT-DELIVERY-SUMMARY.json || true
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-LT500-SUPPORT-DELIVERY-HUNT
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            fu_7-LT500-SUPPORT-DELIVERY-HITS.csv
+            fu_7-LT500-SUPPORT-DELIVERY-HITS.json
+            fu_7-LT500-SUPPORT-DELIVERY-SUMMARY.json
