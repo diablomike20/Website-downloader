@@ -627,21 +627,38 @@ async function crawlAllEmulators(options) {
 
   await fsp.mkdir(outputRoot, { recursive: true });
 
-  for (const model of models) {
+  const failures = [];
+
+  for (let index = 0; index < models.length; index++) {
+    const model = models[index];
     if (typeof options.shouldCancel === 'function' && options.shouldCancel()) break;
 
-    const result = await crawl({
-      url: new URL('/emulator/' + encodeURIComponent(model) + '/', new URL(indexUrl).origin).href,
-      output: path.join(outputRoot, model),
-      maxBytes: options.maxBytes,
-      maxRequests: options.maxRequests,
-      delayMs: options.delayMs,
-      timeoutMs: options.timeoutMs,
-      userAgent: options.userAgent,
-      shouldCancel: options.shouldCancel
-    });
+    console.log('[fu_6] [' + (index + 1) + '/' + models.length + '] capture ' + model);
 
-    results.push(result);
+    try {
+      const result = await crawl({
+        url: new URL('/emulator/' + encodeURIComponent(model) + '/', new URL(indexUrl).origin).href,
+        output: path.join(outputRoot, model),
+        maxBytes: options.maxBytes,
+        maxRequests: options.maxRequests,
+        delayMs: options.delayMs,
+        timeoutMs: options.timeoutMs,
+        userAgent: options.userAgent,
+        shouldCancel: options.shouldCancel
+      });
+
+      results.push(result);
+      console.log(
+        '[fu_6] [' + (index + 1) + '/' + models.length + '] done ' + model +
+        ': ' + result.visited + ' responses, ' + result.routes + ' routes'
+      );
+    } catch (err) {
+      failures.push({ model, error: err && err.message ? err.message : String(err) });
+      console.error(
+        '[fu_6] [' + (index + 1) + '/' + models.length + '] failed ' + model + ': ' +
+        (err && err.message ? err.message : String(err))
+      );
+    }
   }
 
   const summary = results.map((r) => ({
@@ -655,6 +672,11 @@ async function crawlAllEmulators(options) {
   await fsp.writeFile(
     path.join(outputRoot, 'fu_6-models.json'),
     JSON.stringify(summary, null, 2) + '\n'
+  );
+
+  await fsp.writeFile(
+    path.join(outputRoot, 'fu_6-failures.json'),
+    JSON.stringify(failures, null, 2) + '\n'
   );
 
   const routeMaster = new Set();
@@ -677,6 +699,8 @@ async function crawlAllEmulators(options) {
     outputRoot,
     models: models.length,
     completed: results.length,
+    failed: failures.length,
+    failures,
     results: summary
   };
 }
