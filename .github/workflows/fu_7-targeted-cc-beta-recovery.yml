@@ -1,0 +1,144 @@
+name: FU_7 Targeted CommonCrawl Beta Recovery
+
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-targeted-cc-beta-recovery.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Targeted WARC recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p recovered evidence
+          python3 - <<'PY'
+          import gzip,io,json,os,re,hashlib,urllib.parse,urllib.request
+
+          UA="Mozilla/5.0 OpenCudy-FU7-TargetedCC"
+          jobs=[
+            ("WR3600H-2311","https://4pda.to/forum/index.php?showtopic=1103718&st=180",
+             "R69-2.3.11Beta-20250429-100114-sysupgrade",
+             ["CC-MAIN-2025-21","CC-MAIN-2025-26","CC-MAIN-2025-30"]),
+            ("WR3600H-2315","https://4pda.to/forum/index.php?showtopic=1103718&st=380",
+             "WR3600H-R69-2.3.15Beta-20250916-202013-sysupgrade",
+             ["CC-MAIN-2025-38","CC-MAIN-2025-43","CC-MAIN-2025-47"]),
+            ("WR6500H-beta","https://4pda.to/forum/index.php?showtopic=1104836&st=260",
+             "1EN12-4KNFeSc2M3v",
+             ["CC-MAIN-2026-08","CC-MAIN-2026-12","CC-MAIN-2026-17"]),
+          ]
+
+          def get(url,timeout=45,headers=None):
+              h={"User-Agent":UA,"Accept":"*/*"}
+              if headers:h.update(headers)
+              req=urllib.request.Request(url,headers=h)
+              with urllib.request.urlopen(req,timeout=timeout) as r:
+                  return r.read(),r.status,dict(r.headers)
+
+          links=[]
+          def add(tag,u,src):
+              if not u:return
+              u=urllib.parse.unquote(u.replace("&amp;","&").replace("\\u0026","&"))
+              if u.startswith("//"):u="https:"+u
+              if not any(x["tag"]==tag and x["url"]==u for x in links):
+                  links.append({"tag":tag,"url":u,"source":src})
+
+          evidence=[]
+          for tag,page,needle,indexes in jobs:
+              for idx in indexes:
+                  for hostpage in [page,page.replace("4pda.to","4pda.ru")]:
+                      q=urllib.parse.urlencode({"url":hostpage,"output":"json"})
+                      try:b,_,_=get(f"https://index.commoncrawl.org/{idx}-index?{q}",20)
+                      except Exception as e:
+                          evidence.append({"tag":tag,"index":idx,"query":hostpage,"error":repr(e)});continue
+                      rows=[]
+                      for ln in b.decode("utf-8","replace").splitlines():
+                          try:o=json.loads(ln)
+                          except:continue
+                          if o.get("status")=="200" and all(o.get(k) for k in ("filename","offset","length")):
+                              rows.append(o)
+                      print(tag,idx,"ROWS",len(rows))
+                      for ri,o in enumerate(rows,1):
+                          start=int(o["offset"]);end=start+int(o["length"])-1
+                          try:rawz,_,_=get("https://data.commoncrawl.org/"+o["filename"],50,{"Range":f"bytes={start}-{end}"})
+                          except Exception as e:continue
+                          try:raw=gzip.decompress(rawz)
+                          except:
+                              try:raw=gzip.GzipFile(fileobj=io.BytesIO(rawz)).read()
+                              except:raw=rawz
+                          txt=raw.decode("utf-8","replace")
+                          low=txt.lower()
+                          match=needle.lower() in low
+                          if tag=="WR6500H-beta":match=match or ("drive.google" in low and "wr6500" in low)
+                          if not match:continue
+                          p=low.find(needle.lower())
+                          if p<0:p=low.find("drive.google")
+                          frag=txt[max(0,p-20000):p+25000]
+                          fn=f"evidence/{tag}-{idx}-{ri}.txt"
+                          open(fn,"w",encoding="utf-8").write(frag)
+                          for m in re.finditer(r'(?i)(?:href|src)=["\']([^"\']+)["\']',frag):
+                              u=urllib.parse.urljoin(page,m.group(1))
+                              if ("/forum/dl/post/" in u or "drive.google" in u.lower()
+                                  or needle.lower() in u.lower()):
+                                  add(tag,u,f"{idx}:HREF")
+                          for m in re.finditer(r'(?i)https?://[^"\'<>\s]+',frag):
+                              u=m.group(0)
+                              if ("/forum/dl/post/" in u or "drive.google" in u.lower()
+                                  or needle.lower() in u.lower()):
+                                  add(tag,u,f"{idx}:RAW")
+                          evidence.append({"tag":tag,"index":idx,"digest":o.get("digest"),"evidence":fn})
+
+          # Expand Drive URLs
+          for x in list(links):
+              u=x["url"]
+              if "drive.google" not in u.lower():continue
+              m=re.search(r'/file/d/([^/]+)',u) or re.search(r'[?&]id=([^&]+)',u)
+              if m:
+                  fid=m.group(1)
+                  add(x["tag"],f"https://drive.usercontent.google.com/download?id={fid}&export=download&confirm=t","DRIVE_DIRECT:"+x["source"])
+
+          downloads=[]
+          for x in links:
+              try:
+                  data,st,h=get(x["url"],100)
+                  sha=hashlib.sha256(data).hexdigest()
+                  htmlish=b"<html" in data[:2000].lower() or b"<!doctype" in data[:2000].lower()
+                  rec={**x,"status":st,"size":len(data),"sha256":sha,"content_type":h.get("Content-Type",""),"htmlish":htmlish}
+                  if len(data)>1_000_000 and not htmlish:
+                      cd=h.get("Content-Disposition","")
+                      mm=re.search(r'filename\*?=(?:UTF-8\'\')?["\']?([^;"\']+)',cd,re.I)
+                      name=urllib.parse.unquote(mm.group(1).strip()) if mm else ""
+                      if not name:name=urllib.parse.unquote(urllib.parse.urlsplit(x["url"]).path.rsplit("/",1)[-1])
+                      if not name or "." not in name:name=x["tag"]+"-"+sha[:8]+".bin"
+                      name=re.sub(r'[^A-Za-z0-9._()+ -]+','_',name)
+                      out="recovered/"+name
+                      if os.path.exists(out):out="recovered/"+sha[:8]+"-"+name
+                      open(out,"wb").write(data);rec["saved_as"]=out
+                      print("SAVED",x["tag"],out,len(data),sha,x["url"])
+                  downloads.append(rec)
+              except Exception as e:
+                  downloads.append({**x,"error":repr(e)})
+
+          summary={"links":links,"downloads":downloads,"evidence":evidence}
+          json.dump(summary,open("fu_7-TARGETED-CC-BETA-RECOVERY.json","w"),indent=2,ensure_ascii=False)
+          print(json.dumps({"links":links,"saved":[x for x in downloads if x.get("saved_as")]},indent=2,ensure_ascii=False))
+          PY
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-TARGETED-CC-BETA-RECOVERY
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            recovered/*
+            fu_7-TARGETED-CC-BETA-RECOVERY.json
+            evidence/*
