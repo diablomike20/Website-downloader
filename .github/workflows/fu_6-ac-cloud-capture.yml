@@ -1,0 +1,45 @@
+name: fu_6 AC Cloud full capture
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_6-ac-cloud-capture.yml"
+      - "cudy/**"
+      - "bin/cudy-forensic.js"
+      - "package.json"
+
+jobs:
+  ac-cloud-full:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Capture AC_Cloud completely
+        run: |
+          node bin/cudy-forensic.js \
+            --url https://support.cudy.com/emulator/AC_Cloud/ \
+            --output fu_6-AC_Cloud-full
+      - name: Summarize AC_Cloud
+        run: |
+          echo "Files:"
+          find fu_6-AC_Cloud-full -type f | wc -l
+          echo "Bytes:"
+          du -sb fu_6-AC_Cloud-full
+          echo "Mock API files:"
+          find fu_6-AC_Cloud-full -type f -path '*mock_api*' | wc -l
+          echo "Mock API list:"
+          find fu_6-AC_Cloud-full -type f -path '*mock_api*' | sort || true
+          echo "Firmware/build strings:"
+          grep -RhoE '[0-9]+\.[0-9]+\.[0-9]+-20[0-9]{6}-[0-9]{6}' fu_6-AC_Cloud-full | sort -u || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fu_6-AC_Cloud-full
+          path: fu_6-AC_Cloud-full
+          compression-level: 6
+          include-hidden-files: true
