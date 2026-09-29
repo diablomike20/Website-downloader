@@ -1,0 +1,35 @@
+name: FU_7 Cudy Old Shopify CDN Hunt
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - "scripts/fu_7_cudy_old_shopify_cdn.py"
+      - ".github/workflows/fu_7-cudy-old-shopify-cdn.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Historical Shopify CDN hunt
+        run: python3 scripts/fu_7_cudy_old_shopify_cdn.py
+      - name: Summary
+        if: always()
+        run: cat fu_7-CUDY-OLD-SHOPIFY-SUMMARY.json || true
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-CUDY-OLD-SHOPIFY-CDN-HUNT
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            fu_7-CUDY-OLD-SHOPIFY-INDEX.csv
+            fu_7-CUDY-OLD-SHOPIFY-R25.csv
+            fu_7-CUDY-OLD-SHOPIFY-CSP25.csv
+            fu_7-CUDY-OLD-SHOPIFY-R25-CSP25.csv
+            fu_7-CUDY-OLD-SHOPIFY-FLASHZIP.csv
+            fu_7-CUDY-OLD-SHOPIFY-SUMMARY.json
