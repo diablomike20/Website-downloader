@@ -1,0 +1,124 @@
+name: FU_7 Build Master Dev Archive
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-build-master-dev-archive.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download dev harvest
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-CUDY-DEV-HARVEST
+          path: master/fu_7-CUDY-DEV-HARVEST
+
+      - name: Download WR3000 beta
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-WR3000-ADBLOCK-BETA
+          path: master/fu_7-WR3000-ADBLOCK-BETA
+
+      - name: Download CDN archive hunt
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-CUDY-DEV-CDN-ARCHIVE-HUNT
+          path: master/fu_7-CUDY-DEV-CDN-ARCHIVE-HUNT
+
+      - name: Download P5 beta recovery
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-P5-WIFICALLING-BETA
+          path: master/fu_7-P5-WIFICALLING-BETA
+
+      - name: Download P2 deep collection
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-P2-DEEP-COLLECTION
+          path: master/fu_7-P2-DEEP-COLLECTION
+
+      - name: Download 4PDA beta recovery
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-4PDA-CUDY-BETA-RECOVERY
+          path: master/fu_7-4PDA-CUDY-BETA-RECOVERY
+
+      - name: Download named beta recovery
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-RECOVERED-CUDY-BETAS
+          path: master/fu_7-RECOVERED-CUDY-BETAS
+
+      - name: Download beta FAQ recovery
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-CUDY-BETA-FAQ-RECOVERY
+          path: master/fu_7-CUDY-BETA-FAQ-RECOVERY
+
+      - name: Download beta version hunt
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-CUDY-BETA-VERSION-HUNT
+          path: master/fu_7-CUDY-BETA-VERSION-HUNT
+
+      - name: Download historical dev links
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-CUDYFORUM-HISTORICAL-DEV
+          path: master/fu_7-CUDYFORUM-HISTORICAL-DEV
+
+      - name: Download P5 MediaFire recovery
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-P5-MEDIAFIRE-RECOVERY
+          path: master/fu_7-P5-MEDIAFIRE-RECOVERY
+
+      - name: Download 4PDA attachment hunt
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-4PDA-CUDY-BETA-ATTACHMENTS
+          path: master/fu_7-4PDA-CUDY-BETA-ATTACHMENTS
+
+      - name: Build master archive
+        shell: bash
+        run: |
+          set -euxo pipefail
+          find master -type f -printf '%p	%s bytes
+' | sort > fu_7-CUDY-DEV-FIRMWARE-MASTER-FILELIST.txt
+          python3 - <<'PY'
+          import os, hashlib, json
+          rows=[]
+          for dp,_,fns in os.walk("master"):
+              for fn in sorted(fns):
+                  p=os.path.join(dp,fn)
+                  h=hashlib.sha256()
+                  with open(p,"rb") as f:
+                      for chunk in iter(lambda:f.read(1024*1024),b""):
+                          h.update(chunk)
+                  rows.append({"path":p,"size":os.path.getsize(p),"sha256":h.hexdigest()})
+          with open("fu_7-CUDY-DEV-FIRMWARE-MASTER-MANIFEST.json","w",encoding="utf-8") as f:
+              json.dump(rows,f,indent=2,ensure_ascii=False)
+          print("files",len(rows))
+          print("bytes",sum(x["size"] for x in rows))
+          PY
+          zip -r -0 fu_7-CUDY-DEV-FIRMWARE-MASTER.zip master             fu_7-CUDY-DEV-FIRMWARE-MASTER-FILELIST.txt             fu_7-CUDY-DEV-FIRMWARE-MASTER-MANIFEST.json
+
+      - name: Upload master archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-CUDY-DEV-FIRMWARE-MASTER
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
+          path: |
+            fu_7-CUDY-DEV-FIRMWARE-MASTER.zip
+            fu_7-CUDY-DEV-FIRMWARE-MASTER-FILELIST.txt
+            fu_7-CUDY-DEV-FIRMWARE-MASTER-MANIFEST.json
