@@ -1,0 +1,77 @@
+name: FU_7 Old Shopify LT500 Prefix
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-old-shopify-lt500-prefix.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Query Wayback historical Cudy Shopify LT500 prefix
+        shell: bash
+        run: |
+          set -e
+          python3 - <<'PY'
+          import json, urllib.parse, urllib.request, csv
+          base="cdn.shopify.com/s/files/1/0673/4748/0820/files/"
+          prefixes=["LT500","LT500D","LT450-LT500"]
+          allrows={}
+          for pfx in prefixes:
+              q=urllib.parse.urlencode([
+                ("url",base+pfx+"*"),
+                ("output","json"),
+                ("fl","timestamp,original,statuscode,mimetype,digest,length"),
+                ("filter","statuscode:200"),
+                ("collapse","urlkey"),
+              ])
+              u="https://web.archive.org/cdx/search/cdx?"+q
+              try:
+                  req=urllib.request.Request(u,headers={"User-Agent":"OpenCudy-FU7/1.0"})
+                  with urllib.request.urlopen(req,timeout=90) as r:
+                      data=json.loads(r.read().decode("utf-8","replace"))
+                  if data:
+                      h=data[0]
+                      for row in data[1:]:
+                          o=dict(zip(h,row))
+                          url=o.get("original","")
+                          if url:
+                              o["prefix"]=pfx
+                              allrows[url]=o
+                  print(pfx, max(0,len(data)-1 if data else 0))
+              except Exception as e:
+                  print("ERROR",pfx,repr(e))
+          rows=[]
+          for u,o in allrows.items():
+              fn=urllib.parse.unquote(urllib.parse.urlsplit(u).path.rsplit("/",1)[-1])
+              rows.append({
+                "filename":fn,"url":u,"prefix":o.get("prefix",""),
+                "timestamp":o.get("timestamp",""),"statuscode":o.get("statuscode",""),
+                "mimetype":o.get("mimetype",""),"digest":o.get("digest",""),"length":o.get("length",""),
+                "is_csp25":"YES" if "2.5." in fn.lower() else "NO",
+                "is_r25":"YES" if "r25" in fn.lower() else "NO",
+              })
+          rows.sort(key=lambda x:(x["filename"].lower(),x["url"]))
+          fields=["filename","url","prefix","timestamp","statuscode","mimetype","digest","length","is_csp25","is_r25"]
+          with open("fu_7-OLD-SHOPIFY-LT500-PREFIX.csv","w",newline="",encoding="utf-8") as f:
+              w=csv.DictWriter(f,fieldnames=fields);w.writeheader();w.writerows(rows)
+          hits=[r for r in rows if r["is_csp25"]=="YES"]
+          summary={"unique_urls":len(rows),"csp25_hits":len(hits),"hits":hits}
+          with open("fu_7-OLD-SHOPIFY-LT500-PREFIX-SUMMARY.json","w",encoding="utf-8") as f:
+              json.dump(summary,f,indent=2,ensure_ascii=False)
+          print(json.dumps(summary,indent=2,ensure_ascii=False))
+          PY
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-OLD-SHOPIFY-LT500-PREFIX
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            fu_7-OLD-SHOPIFY-LT500-PREFIX.csv
+            fu_7-OLD-SHOPIFY-LT500-PREFIX-SUMMARY.json
