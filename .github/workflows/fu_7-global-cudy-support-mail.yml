@@ -1,0 +1,37 @@
+name: FU_7 Global Cudy Support Mail Hunt
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - "scripts/fu_7_cudy_global_support_mail.py"
+      - ".github/workflows/fu_7-global-cudy-support-mail.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Harvest all support-email firmware delivery traces
+        run: python3 scripts/fu_7_cudy_global_support_mail.py
+      - name: Summary
+        if: always()
+        run: cat fu_7-CUDY-GLOBAL-SUPPORT-MAIL-SUMMARY.json || true
+      - name: Pack
+        if: always()
+        run: |
+          zip -9 fu_7-CUDY-GLOBAL-SUPPORT-MAIL-HUNT.zip             fu_7-CUDY-GLOBAL-SUPPORT-MAIL-HITS.csv             fu_7-CUDY-GLOBAL-SUPPORT-MAIL-PAIRS.csv             fu_7-CUDY-GLOBAL-SUPPORT-MAIL-SUMMARY.json || true
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-CUDY-GLOBAL-SUPPORT-MAIL-HUNT
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            fu_7-CUDY-GLOBAL-SUPPORT-MAIL-HUNT.zip
+            fu_7-CUDY-GLOBAL-SUPPORT-MAIL-HITS.csv
+            fu_7-CUDY-GLOBAL-SUPPORT-MAIL-PAIRS.csv
+            fu_7-CUDY-GLOBAL-SUPPORT-MAIL-SUMMARY.json
