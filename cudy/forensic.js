@@ -607,7 +607,7 @@ async function discoverEmulatorModels(indexUrl, options) {
 
   const response = await requestBuffer(index.href, requestOptions, 0);
   const text = response.body.toString('utf8');
-  const models = new Set();
+  const models = new Set(['AC_Cloud']);
   const re = /(?:https?:\/\/support\.cudy\.com)?\/emulator\/([^/"'?&#<>]+)\//gi;
   let match;
 
