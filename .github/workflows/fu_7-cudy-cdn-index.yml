@@ -1,0 +1,47 @@
+name: FU_7 Cudy CDN Index
+
+on:
+  push:
+    branches:
+      - fu_7-cudy-cdn-index
+    paths:
+      - "scripts/fu_7_cudy_cdn_index.py"
+      - ".github/workflows/fu_7-cudy-cdn-index.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Cudy CDN index
+        run: |
+          python3 scripts/fu_7_cudy_cdn_index.py
+
+      - name: Show candidate summary
+        if: always()
+        run: |
+          echo "=== SUMMARY ==="
+          cat fu_7-CUDY-CDN-INDEX-SUMMARY.json || true
+          echo
+          echo "=== R25 / LT500 candidates ==="
+          sed -n '1,120p' fu_7-CUDY-CDN-R25-LT500-CANDIDATES.csv || true
+
+      - name: Upload index
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-CUDY-CDN-INDEX
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            fu_7-CUDY-CDN-FILES-INDEX.csv
+            fu_7-CUDY-CDN-R25-LT500-CANDIDATES.csv
+            fu_7-CUDY-CDN-INDEX-SUMMARY.json
