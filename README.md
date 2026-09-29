@@ -25,6 +25,58 @@ Download the complete source code of any website (including all assets) 🔨.
 - --adjust-extension – Adds suitable extensions to filenames (html or css) depending on their content-type.
 - --page-requisites – Download things like CSS style-sheets and images required to properly display the page offline.
 - --no-parent – When recursing do not ascend to the parent directory. It useful for restricting the download to only a portion of the site
+
+## fu_6 Cudy Emulator Forensic mode
+
+This fork now contains a Cudy-specific read-only crawler for the public emulator trees under:
+
+```text
+https://support.cudy.com/emulator/<MODEL>/
+```
+
+Unlike a normal `wget --mirror`, it also scans downloaded HTML/JS for LuCI routes and reproduces the public emulator bootstrap's static route mapping. This is useful for snapshots that are not reachable by simply clicking through the visible menus.
+
+It preserves response bytes exactly and writes SHA-256 hashes and a route inventory.
+
+### Run
+
+```bash
+npm run cudy-forensic -- \
+  --url https://support.cudy.com/emulator/C200P/ \
+  --output cudy-forensic-output/C200P
+```
+
+Useful limits:
+
+```bash
+npm run cudy-forensic -- \
+  --url https://support.cudy.com/emulator/C200P/ \
+  --max-requests 2500 \
+  --max-bytes 67108864 \
+  --delay-ms 100 \
+  --timeout-ms 20000
+```
+
+The output contains:
+
+```text
+raw/                         byte-exact public responses
+fu_6-inventory.csv           URL/status/MIME/size/SHA256/local path
+fu_6-all-luci-routes.txt     LuCI routes found in HTML/JS
+fu_6-hidden-luci-routes.txt  routes mapped to emulator snapshots
+fu_6-unresolved.txt          failed/non-2xx URLs
+fu_6-findings.json           firmware/build/model/URL leads
+fu_6-run.json                run settings and safety record
+```
+
+The crawler is intentionally conservative: **GET only**, one selected emulator-model subtree only, known destructive/action routes are skipped, and it does not do authentication bypass, brute force, firmware version guessing or timestamp spraying.
+
+Run the route-mapping tests with:
+
+```bash
+npm run test:cudy
+```
+
 ### Deploy on cloud providers
 [![Run on Replit](https://binbashbanana.github.io/deploy-buttons/buttons/remade/replit.svg)](https://replit.com/github/AhmadIbrahiim/Website-downloader)
 [![Remix on Glitch](https://binbashbanana.github.io/deploy-buttons/buttons/remade/glitch.svg)](https://glitch.com/edit/#!/import/github/AhmadIbrahiim/Website-downloader)
@@ -44,7 +96,7 @@ Download the complete source code of any website (including all assets) 🔨.
 
 ## How to run it 🤔
 
-- `git clone https://github.com/AhmadIbrahiim/Website-downloader.git`
+- `git clone https://github.com/diablomike20/Website-downloader.git`
 - `cd Website-downloader`
 - `$ npm install`
 - `$ npm start`
@@ -66,7 +118,7 @@ Download the complete source code of any website (including all assets) 🔨.
 
 ## Liked it ? You can buy a coffee:
 
-<a href="https://www.buymeacoffee.com/aibrahim" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
+<a href="https://www.buymeacoffee.com/aibrahim" target="_blank"><img src="https://www.buymeacoffee.com/aibrahim" alt=""></a>
 
 Thank you,
 
