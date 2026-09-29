@@ -1,0 +1,31 @@
+name: fu_6 AC Cloud mock-path probe
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_6-ac-cloud-mock-probe.yml"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe public AC_Cloud static mock paths
+        shell: bash
+        run: |
+          set -u
+          urls=(
+            "https://support.cudy.com/emulator/AC_Cloud/mock_api/web/v1/device/list.json"
+            "https://support.cudy.com/emulator/AC_Cloud/mock_api/v1/device/list.json"
+            "https://support.cudy.com/emulator/AC_Cloud/mock_api/web/v1/device/ac/upgrade/check.json"
+            "https://support.cudy.com/emulator/AC_Cloud/mock_api/v1/device/ac/upgrade/check.json"
+          )
+          for url in "${urls[@]}"; do
+            echo "=== $url ==="
+            code=$(curl -L -sS -o /tmp/body -w "%{http_code}" "$url" || true)
+            echo "HTTP $code"
+            wc -c /tmp/body || true
+            head -c 1000 /tmp/body || true
+            echo
+          done
