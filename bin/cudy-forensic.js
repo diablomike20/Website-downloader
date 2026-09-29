@@ -2,7 +2,7 @@
 'use strict';
 
 const path = require('path');
-const { crawl } = require('../cudy/forensic');
+const { crawl, crawlAllEmulators } = require('../cudy/forensic');
 
 function parseArgs(argv) {
   const out = {};
@@ -12,6 +12,11 @@ function parseArgs(argv) {
 
     if (arg === '--help' || arg === '-h') {
       out.help = true;
+      continue;
+    }
+
+    if (arg === '--all') {
+      out.all = true;
       continue;
     }
 
@@ -37,9 +42,11 @@ function help() {
     '',
     'Usage:',
     '  node bin/cudy-forensic.js --url https://support.cudy.com/emulator/C200P/ [options]',
+    '  node bin/cudy-forensic.js --all [--url https://support.cudy.com/] [options]',
     '',
     'Options:',
-    '  --url URL',
+    '  --all              discover and capture every emulator listed by support.cudy.com',
+    '  --url URL          model URL, or support.cudy.com index URL with --all',
     '  --output DIR',
     '  --max-requests N    default: 0 (unlimited)',
     '  --max-bytes N       default: 0 (unlimited)',
@@ -62,7 +69,7 @@ function help() {
       return;
     }
 
-    if (!args.url) {
+    if (!args.url && !args.all) {
       help();
       process.exitCode = 2;
       return;
@@ -70,7 +77,16 @@ function help() {
 
     if (args.output) args.output = path.resolve(args.output);
 
-    const result = await crawl(args);
+    const result = args.all
+      ? await crawlAllEmulators({
+          indexUrl: args.url || 'https://support.cudy.com/',
+          output: args.output,
+          maxRequests: args.maxRequests,
+          maxBytes: args.maxBytes,
+          delayMs: args.delayMs,
+          timeoutMs: args.timeoutMs
+        })
+      : await crawl(args);
     console.log(JSON.stringify(result, null, 2));
   } catch (err) {
     console.error('fu_6 error: ' + err.message);
