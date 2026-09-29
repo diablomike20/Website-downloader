@@ -1,0 +1,60 @@
+name: FU_7 Cudy CDN CSP25 Only
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-cudy-cdn-csp25-only.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Query all archived Cudy CDN URLs containing 2.5.
+        shell: bash
+        run: |
+          set -e
+          python3 - <<'PY'
+          import json,urllib.parse,urllib.request,csv
+          params=[
+            ("url","www.cudy.com/cdn/shop/files/*"),
+            ("output","json"),
+            ("fl","timestamp,original,statuscode,mimetype,digest,length"),
+            ("filter","statuscode:200"),
+            ("filter",r"original:.*2\.5\..*"),
+            ("collapse","urlkey"),
+          ]
+          u="https://web.archive.org/cdx/search/cdx?"+urllib.parse.urlencode(params)
+          req=urllib.request.Request(u,headers={"User-Agent":"OpenCudy-FU7-CSP25/1.0"})
+          with urllib.request.urlopen(req,timeout=150) as r:
+              data=json.loads(r.read().decode("utf-8","replace"))
+          rows=[]
+          if data:
+              h=data[0]
+              for rr in data[1:]:
+                  o=dict(zip(h,rr))
+                  fn=urllib.parse.unquote(urllib.parse.urlsplit(o.get("original","")).path.rsplit("/",1)[-1])
+                  o["filename"]=fn
+                  o["is_r25"]="YES" if "r25" in fn.lower() else "NO"
+                  o["is_lt500"]="YES" if "lt500" in fn.lower() else "NO"
+                  rows.append(o)
+          fields=["filename","original","timestamp","statuscode","mimetype","digest","length","is_r25","is_lt500"]
+          with open("fu_7-CUDY-CDN-CSP25-ONLY.csv","w",newline="",encoding="utf-8") as f:
+              w=csv.DictWriter(f,fieldnames=fields);w.writeheader();w.writerows(rows)
+          hits=[x for x in rows if x["is_r25"]=="YES" or x["is_lt500"]=="YES"]
+          summary={"total_csp25_urls":len(rows),"r25_or_lt500_hits":len(hits),"hits":hits}
+          open("fu_7-CUDY-CDN-CSP25-ONLY-SUMMARY.json","w",encoding="utf-8").write(json.dumps(summary,indent=2,ensure_ascii=False))
+          print(json.dumps(summary,indent=2,ensure_ascii=False))
+          PY
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-CUDY-CDN-CSP25-ONLY
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            fu_7-CUDY-CDN-CSP25-ONLY.csv
+            fu_7-CUDY-CDN-CSP25-ONLY-SUMMARY.json
