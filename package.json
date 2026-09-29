@@ -6,7 +6,7 @@
     "start": "node ./bin/www",
     "dev": "export NODE_ENV=Development && npm start",
     "cudy-forensic": "node ./bin/cudy-forensic.js",
-    "test:cudy": "node --test test/cudy-forensic.test.js"
+    "test:cudy": "node test/cudy-forensic.test.js"
   },
   "dependencies": {
     "archiver": "^3.1.1",
