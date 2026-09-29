@@ -1,0 +1,74 @@
+name: FU_7 Download RE3000 Recovery Leak
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-download-re3000-recovery-leak.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Install gdown
+        run: python3 -m pip install "gdown>=6.4.1"
+
+      - name: Download leaked Cudy Drive artifact
+        shell: bash
+        run: |
+          set -e
+          mkdir -p fu_7-RE3000-RECOVERY-LEAK
+          cd fu_7-RE3000-RECOVERY-LEAK
+          gdown "https://drive.google.com/uc?id=1-eBYYYbdL_141gVh9M874No5YMhEsru5"
+          cd ..
+          count=$(find fu_7-RE3000-RECOVERY-LEAK -type f | wc -l)
+          echo "downloaded_files=$count"
+          test "$count" -gt 0
+
+      - name: Extract recursively and hash
+        shell: bash
+        run: |
+          set -e
+          mkdir -p fu_7-RE3000-RECOVERY-LEAK/extracted
+          python3 - <<'PY'
+          import os,zipfile,tarfile,shutil,hashlib,csv,json
+          root="fu_7-RE3000-RECOVERY-LEAK"
+          ext=os.path.join(root,"extracted")
+          for fn in list(os.listdir(root)):
+              p=os.path.join(root,fn)
+              if not os.path.isfile(p): continue
+              try:
+                  if zipfile.is_zipfile(p):
+                      with zipfile.ZipFile(p) as z:z.extractall(ext)
+                  elif tarfile.is_tarfile(p):
+                      with tarfile.open(p) as t:t.extractall(ext)
+              except Exception as e:
+                  print("EXTRACT_FAIL",p,repr(e))
+          rows=[]
+          for dp,_,fs in os.walk(root):
+              for fn in fs:
+                  p=os.path.join(dp,fn)
+                  h=hashlib.sha256()
+                  with open(p,"rb") as f:
+                      for b in iter(lambda:f.read(1024*1024),b""):h.update(b)
+                  rows.append({"path":os.path.relpath(p,root),"size":os.path.getsize(p),"sha256":h.hexdigest()})
+          rows.sort(key=lambda x:x["path"].lower())
+          with open("fu_7-RE3000-RECOVERY-LEAK-MANIFEST.csv","w",newline="",encoding="utf-8") as f:
+              w=csv.DictWriter(f,fieldnames=["path","size","sha256"]);w.writeheader();w.writerows(rows)
+          json.dump(rows,open("fu_7-RE3000-RECOVERY-LEAK-MANIFEST.json","w"),indent=2)
+          print(json.dumps(rows,indent=2))
+          PY
+          zip -r -9 fu_7-RE3000-RECOVERY-LEAK-COLLECTION.zip             fu_7-RE3000-RECOVERY-LEAK             fu_7-RE3000-RECOVERY-LEAK-MANIFEST.csv             fu_7-RE3000-RECOVERY-LEAK-MANIFEST.json
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-RE3000-RECOVERY-LEAK
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            fu_7-RE3000-RECOVERY-LEAK-COLLECTION.zip
+            fu_7-RE3000-RECOVERY-LEAK-MANIFEST.csv
+            fu_7-RE3000-RECOVERY-LEAK-MANIFEST.json
