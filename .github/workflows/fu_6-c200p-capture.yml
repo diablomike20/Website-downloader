@@ -50,3 +50,4 @@ jobs:
           name: fu_6-C200P-full
           path: fu_6-C200P-full
           compression-level: 6
+          include-hidden-files: true
