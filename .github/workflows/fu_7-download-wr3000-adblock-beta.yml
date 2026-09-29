@@ -1,0 +1,50 @@
+name: FU_7 Download WR3000 AdBlock Beta
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-download-wr3000-adblock-beta.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install gdown
+        run: python3 -m pip install "gdown>=6.4.1"
+
+      - name: Download WR3000 AdBlock beta
+        run: |
+          set -e
+          mkdir -p fu_7-WR3000-ADBLOCK-BETA
+          cd fu_7-WR3000-ADBLOCK-BETA
+          gdown "https://drive.google.com/uc?id=1FjO2JABXSdyY1AXWAjVVje8BYAu8iomt"
+          cd ..
+          python3 - <<'PY'
+          import os,hashlib,json,csv
+          root="fu_7-WR3000-ADBLOCK-BETA"
+          rows=[]
+          for fn in sorted(os.listdir(root)):
+              p=os.path.join(root,fn)
+              if not os.path.isfile(p): continue
+              h=hashlib.sha256(open(p,"rb").read()).hexdigest()
+              rows.append({"filename":fn,"size":os.path.getsize(p),"sha256":h})
+              print(fn,os.path.getsize(p),h)
+          open("fu_7-WR3000-ADBLOCK-BETA-MANIFEST.json","w",encoding="utf-8").write(json.dumps(rows,indent=2))
+          with open("fu_7-WR3000-ADBLOCK-BETA-MANIFEST.csv","w",newline="",encoding="utf-8") as f:
+              w=csv.DictWriter(f,fieldnames=["filename","size","sha256"]);w.writeheader();w.writerows(rows)
+          PY
+          zip -r -9 fu_7-WR3000-ADBLOCK-BETA.zip fu_7-WR3000-ADBLOCK-BETA fu_7-WR3000-ADBLOCK-BETA-MANIFEST.*
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-WR3000-ADBLOCK-BETA
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            fu_7-WR3000-ADBLOCK-BETA.zip
+            fu_7-WR3000-ADBLOCK-BETA-MANIFEST.csv
+            fu_7-WR3000-ADBLOCK-BETA-MANIFEST.json
