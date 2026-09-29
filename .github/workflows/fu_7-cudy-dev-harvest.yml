@@ -1,0 +1,37 @@
+name: FU_7 Comprehensive Cudy Dev Harvest
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - "scripts/fu_7_cudy_dev_harvest.py"
+      - ".github/workflows/fu_7-cudy-dev-harvest.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan Cudy dev/private firmware traces
+        run: python3 scripts/fu_7_cudy_dev_harvest.py
+      - name: Show summary
+        if: always()
+        run: |
+          cat fu_7-CUDY-DEV-HARVEST/summary.json || true
+          echo "=== CANDIDATES ==="
+          sed -n '1,220p' fu_7-CUDY-DEV-HARVEST/filenames_aggregated.csv || true
+      - name: Pack
+        if: always()
+        run: zip -r -9 fu_7-CUDY-DEV-HARVEST.zip fu_7-CUDY-DEV-HARVEST || true
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-CUDY-DEV-HARVEST
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            fu_7-CUDY-DEV-HARVEST.zip
+            fu_7-CUDY-DEV-HARVEST/**
