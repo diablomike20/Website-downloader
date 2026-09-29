@@ -234,10 +234,10 @@ function startCudyForensic(target, jobId, jobDir, send, done) {
   cudyForensic({
     url: target.href,
     output: outputDir,
-    maxRequests: Number(process.env.CUDY_FORENSIC_MAX_REQUESTS) || 2500,
-    maxBytes: Number(process.env.CUDY_FORENSIC_MAX_BYTES) || 64 * 1024 * 1024,
-    delayMs: Number(process.env.CUDY_FORENSIC_DELAY_MS) || 100,
-    timeoutMs: Number(process.env.CUDY_FORENSIC_TIMEOUT_MS) || 20000,
+    maxRequests: Number(process.env.CUDY_FORENSIC_MAX_REQUESTS) || 0,
+    maxBytes: Number(process.env.CUDY_FORENSIC_MAX_BYTES) || 0,
+    delayMs: Number(process.env.CUDY_FORENSIC_DELAY_MS) || 0,
+    timeoutMs: Number(process.env.CUDY_FORENSIC_TIMEOUT_MS) || 0,
     shouldCancel: function () { return cancelled; }
   }).then(function (result) {
     if (cancelled) {
