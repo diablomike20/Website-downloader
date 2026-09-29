@@ -302,6 +302,44 @@ function safeSegment(segment) {
   return decoded || '_';
 }
 
+function extensionFromContentType(contentType) {
+  const type = String(contentType || '').split(';', 1)[0].trim().toLowerCase();
+  const map = {
+    'text/html': '.html',
+    'application/xhtml+xml': '.html',
+    'text/css': '.css',
+    'text/javascript': '.js',
+    'application/javascript': '.js',
+    'application/x-javascript': '.js',
+    'application/json': '.json',
+    'text/json': '.json',
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'image/svg+xml': '.svg',
+    'image/x-icon': '.ico',
+    'image/vnd.microsoft.icon': '.ico',
+    'font/woff': '.woff',
+    'font/woff2': '.woff2',
+    'application/font-woff': '.woff',
+    'application/font-woff2': '.woff2',
+    'application/vnd.ms-fontobject': '.eot',
+    'font/ttf': '.ttf',
+    'font/otf': '.otf',
+    'application/xml': '.xml',
+    'text/xml': '.xml',
+    'application/zip': '.zip',
+    'application/gzip': '.gz',
+    'application/x-gzip': '.gz',
+    'application/x-tar': '.tar',
+    'audio/mpeg': '.mp3',
+    'video/mp4': '.mp4',
+    'video/webm': '.webm'
+  };
+  return map[type] || '.bin';
+}
+
 function outputPathForUrl(url, contentType, base) {
   const u = new URL(url);
   const isDirectoryUrl = u.pathname.endsWith('/');
@@ -312,16 +350,19 @@ function outputPathForUrl(url, contentType, base) {
   }
   let name = isDirectoryUrl ? 'index' : (parts.pop() || 'index');
 
-  if (u.search) {
-    name += '__q_' + crypto.createHash('sha1').update(u.search).digest('hex').slice(0, 12);
-  }
+  // Keep the original file extension at the end. Previously the query hash
+  // was appended after ".png"/".svg"/".woff", which made the filename look
+  // extensionless and caused an erroneous ".bin" suffix.
+  const originalExt = path.extname(name);
+  const originalStem = originalExt ? name.slice(0, -originalExt.length) : name;
+  const querySuffix = u.search
+    ? '__q_' + crypto.createHash('sha1').update(u.search).digest('hex').slice(0, 12)
+    : '';
 
-  if (!/\.[A-Za-z0-9]{1,8}$/.test(name)) {
-    if (/html/i.test(contentType)) name += '.html';
-    else if (/json/i.test(contentType)) name += '.json';
-    else if (/javascript/i.test(contentType)) name += '.js';
-    else if (/css/i.test(contentType)) name += '.css';
-    else name += '.bin';
+  if (originalExt && /^\.[A-Za-z0-9]{1,8}$/.test(originalExt)) {
+    name = originalStem + querySuffix + originalExt;
+  } else {
+    name = name + querySuffix + extensionFromContentType(contentType);
   }
 
   return path.join.apply(path, parts.concat(name));
