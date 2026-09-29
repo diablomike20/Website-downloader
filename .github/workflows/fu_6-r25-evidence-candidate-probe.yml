@@ -1,0 +1,60 @@
+name: fu_6 R25 evidence candidate probe
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_6-r25-evidence-candidate-probe.yml"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe evidence-derived R25 footprints
+        shell: bash
+        run: |
+          set -u
+
+          echo "=== TARGETED HIDDEN EMULATOR NAMES ==="
+          emus=(
+            "LT500D"
+            "LT500D3"
+            "LT500D3.0"
+            "LT500D-3.0"
+            "LT500-3.0"
+            "LT500V3"
+            "LT500V2"
+          )
+          for n in "${emus[@]}"; do
+            url="https://support.cudy.com/emulator/$n/"
+            rm -f /tmp/body /tmp/headers
+            code=$(curl -L -sS --max-time 20 -D /tmp/headers -o /tmp/body -w "%{http_code}" "$url" || true)
+            ctype=$(grep -i '^content-type:' /tmp/headers | tail -1 | tr -d '\r' || true)
+            bytes=$(wc -c </tmp/body 2>/dev/null || echo 0)
+            title=$(grep -oim1 '<title>[^<]*' /tmp/body 2>/dev/null | sed 's/<title>//I' || true)
+            fw=$(grep -aoE 'FW:[[:space:]]*[0-9]+\.[0-9]+\.[0-9]+-20[0-9]{6}-[0-9]{6}' /tmp/body 2>/dev/null | head -1 || true)
+            echo "$n | HTTP=$code | bytes=$bytes | $ctype | title=$title | $fw"
+          done
+
+          echo
+          echo "=== EVIDENCE-DERIVED EXACT CDN CANDIDATES ==="
+          urls=(
+            "https://www.cudy.com/cdn/shop/files/LT500V2-R25-2.5.12-20260518-234632-flash.zip"
+            "https://www.cudy.com/cdn/shop/files/LT500V2-R25-2.5.14-20260618-150931-flash.zip"
+            "https://www.cudy.com/cdn/shop/files/LT500V2-R25-2.5.14-20260622-090745-flash.zip"
+            "https://www.cudy.com/cdn/shop/files/LT500V2-R25-2.5.15-20260629-160214-flash.zip"
+          )
+          for url in "${urls[@]}"; do
+            rm -f /tmp/body /tmp/headers
+            code=$(curl -L -sS --max-time 30 -D /tmp/headers -o /tmp/body -w "%{http_code}" "$url" || true)
+            ctype=$(grep -i '^content-type:' /tmp/headers | tail -1 | tr -d '\r' || true)
+            clen=$(grep -i '^content-length:' /tmp/headers | tail -1 | tr -d '\r' || true)
+            bytes=$(wc -c </tmp/body 2>/dev/null || echo 0)
+            echo "$url"
+            echo "HTTP=$code | bytes=$bytes | $ctype | $clen"
+            if [ "$code" = "200" ]; then
+              sha256sum /tmp/body || true
+              file /tmp/body || true
+            fi
+          done
