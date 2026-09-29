@@ -1,0 +1,110 @@
+name: fu_6 all emulator autoupgrade snapshot sweep
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_6-autoupgrade-snapshot-sweep.yml"
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sweep public deterministic autoupgrade snapshots
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import csv, html, re, urllib.request, urllib.error
+          from pathlib import Path
+
+          INDEX = "https://support.cudy.com/"
+          UA = "fu_6-autoupgrade-snapshot-sweep/1.0"
+
+          def get(url):
+              req = urllib.request.Request(url, headers={"User-Agent": UA})
+              try:
+                  with urllib.request.urlopen(req, timeout=20) as r:
+                      return r.status, r.read(), r.headers.get_content_type()
+              except urllib.error.HTTPError as e:
+                  return e.code, e.read(), e.headers.get_content_type()
+              except Exception as e:
+                  return 0, str(e).encode(), ""
+
+          status, raw, _ = get(INDEX)
+          text = raw.decode("utf-8", "replace")
+          models = sorted(set(re.findall(r'/emulator/([^/"\'<>?&#]+)/', text, flags=re.I)))
+          # AC_Cloud is SPA, not LuCI autoupgrade.
+          models = [m for m in models if m != "AC_Cloud"]
+
+          rows = []
+          out = Path("fu_6-autoupgrade-sweep")
+          out.mkdir(exist_ok=True)
+
+          patterns = {
+              "firmware_version": re.compile(r'Firmware Version.*?(\d+\.\d+\.\d+-20\d{6}-\d{6})', re.I|re.S),
+              "hardware": re.compile(r'Hardware.*?<p[^>]*>(.*?)</p>', re.I|re.S),
+              "latest_text": re.compile(r'id="cbi-upgrade-1-latest_version".*?<p[^>]*>(.*?)</p>', re.I|re.S),
+              "builds": re.compile(r'\b\d+\.\d+\.\d+-20\d{6}-\d{6}\b'),
+              "artifact": re.compile(r'\b[A-Za-z0-9_.-]+-R\d+-\d+\.\d+\.\d+-20\d{6}-\d{6}-(?:flash|sysupgrade)[A-Za-z0-9_.-]*\.(?:zip|bin)\b', re.I),
+              "url": re.compile(r'https?://[^\s"\'<>]+', re.I),
+          }
+
+          for i, model in enumerate(models, 1):
+              url = f"https://support.cudy.com/emulator/{model}/cgi-bin/luci/admin/system/autoupgrade/updatecheck/nomodal.html"
+              code, body, ctype = get(url)
+              s = body.decode("utf-8", "replace")
+              fw = patterns["firmware_version"].search(s)
+              hw = patterns["hardware"].search(s)
+              lt = patterns["latest_text"].search(s)
+              builds = sorted(set(patterns["builds"].findall(s)))
+              artifacts = sorted(set(patterns["artifact"].findall(s)))
+              urls = sorted(set(patterns["url"].findall(s)))
+              def clean(x):
+                  if not x: return ""
+                  x = re.sub(r'<[^>]+>', ' ', x)
+                  return re.sub(r'\s+', ' ', html.unescape(x)).strip()
+              row = {
+                  "model": model,
+                  "http": code,
+                  "bytes": len(body),
+                  "content_type": ctype,
+                  "firmware_version": fw.group(1) if fw else "",
+                  "hardware": clean(hw.group(1)) if hw else "",
+                  "latest_text": clean(lt.group(1)) if lt else "",
+                  "all_builds": ";".join(builds),
+                  "artifact_names": ";".join(artifacts),
+                  "external_urls": ";".join(urls),
+                  "url": url,
+              }
+              rows.append(row)
+              print(f"[{i}/{len(models)}] {model}: HTTP {code} fw={row['firmware_version']!r} latest={row['latest_text']!r}")
+
+              if code == 200:
+                  (out / f"{model}.html").write_bytes(body)
+
+          with (out / "fu_6-autoupgrade-sweep.csv").open("w", newline="", encoding="utf-8") as f:
+              w = csv.DictWriter(f, fieldnames=list(rows[0].keys()) if rows else ["model"])
+              w.writeheader()
+              w.writerows(rows)
+
+          with (out / "fu_6-interesting.txt").open("w", encoding="utf-8") as f:
+              for r in rows:
+                  if r["http"] == 200 and (r["artifact_names"] or r["external_urls"] or "latest" not in r["latest_text"].lower()):
+                      f.write(repr(r) + "\n")
+
+          print("SUMMARY", {
+              "models": len(models),
+              "http_200": sum(r["http"] == 200 for r in rows),
+              "with_fw": sum(bool(r["firmware_version"]) for r in rows),
+              "with_artifact_names": sum(bool(r["artifact_names"]) for r in rows),
+              "with_external_urls": sum(bool(r["external_urls"]) for r in rows),
+          })
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fu_6-autoupgrade-sweep
+          path: fu_6-autoupgrade-sweep
+          compression-level: 6
+          include-hidden-files: true
