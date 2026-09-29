@@ -1,0 +1,38 @@
+name: FU_7 Recover Cudy Beta FAQ Links
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - "scripts/fu_7_cudy_beta_faq_link_recover.py"
+      - ".github/workflows/fu_7-cudy-beta-faq-link-recover.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover original beta links and binaries from archived FAQs
+        run: python3 scripts/fu_7_cudy_beta_faq_link_recover.py
+      - name: Summary
+        if: always()
+        run: cat fu_7-CUDY-BETA-FAQ-RECOVERY-SUMMARY.json || true
+      - name: Pack
+        if: always()
+        run: |
+          zip -r -9 fu_7-CUDY-BETA-FAQ-RECOVERY.zip             fu_7-CUDY-BETA-FAQ-LINKS.csv             fu_7-CUDY-BETA-FAQ-RECOVERED             fu_7-CUDY-BETA-FAQ-RECOVERED-MANIFEST.csv             fu_7-CUDY-BETA-FAQ-RECOVERY-SUMMARY.json || true
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-CUDY-BETA-FAQ-RECOVERY
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            fu_7-CUDY-BETA-FAQ-RECOVERY.zip
+            fu_7-CUDY-BETA-FAQ-LINKS.csv
+            fu_7-CUDY-BETA-FAQ-RECOVERED/**
+            fu_7-CUDY-BETA-FAQ-RECOVERED-MANIFEST.csv
+            fu_7-CUDY-BETA-FAQ-RECOVERY-SUMMARY.json
