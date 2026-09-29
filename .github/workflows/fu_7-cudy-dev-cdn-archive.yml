@@ -1,0 +1,39 @@
+name: FU_7 Cudy Dev CDN Archive Hunt
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - "scripts/fu_7_cudy_dev_cdn_archive.py"
+      - ".github/workflows/fu_7-cudy-dev-cdn-archive.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hunt and recover dev-named Cudy CDN artifacts
+        run: python3 scripts/fu_7_cudy_dev_cdn_archive.py
+      - name: Summary
+        if: always()
+        run: cat fu_7-CUDY-DEV-CDN-ARCHIVE-SUMMARY.json || true
+      - name: Pack
+        if: always()
+        run: |
+          zip -r -9 fu_7-CUDY-DEV-CDN-ARCHIVE-HUNT.zip             fu_7-CUDY-DEV-CDN-ARCHIVE-INDEX.csv             fu_7-CUDY-DEV-CDN-ARCHIVE-FIRMWARE.csv             fu_7-CUDY-DEV-CDN-RECOVERED             fu_7-CUDY-DEV-CDN-RECOVERED-MANIFEST.csv             fu_7-CUDY-DEV-CDN-ARCHIVE-SUMMARY.json || true
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-CUDY-DEV-CDN-ARCHIVE-HUNT
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            fu_7-CUDY-DEV-CDN-ARCHIVE-HUNT.zip
+            fu_7-CUDY-DEV-CDN-ARCHIVE-INDEX.csv
+            fu_7-CUDY-DEV-CDN-ARCHIVE-FIRMWARE.csv
+            fu_7-CUDY-DEV-CDN-RECOVERED/**
+            fu_7-CUDY-DEV-CDN-RECOVERED-MANIFEST.csv
+            fu_7-CUDY-DEV-CDN-ARCHIVE-SUMMARY.json
