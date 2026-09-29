@@ -19,10 +19,16 @@ jobs:
 
       - name: Download complete public Cudy intermediary folder
         run: |
-          set -e
           rm -rf fu_7-CUDY-INTERMEDIARY-OPENWRT-FIRMWARE
           mkdir -p fu_7-CUDY-INTERMEDIARY-OPENWRT-FIRMWARE
+          set +e
           gdown --folder             "https://drive.google.com/drive/folders/1BKVarlwlNxf7uJUtRhuMGUqeCa5KpMnj?usp=sharing"             -O fu_7-CUDY-INTERMEDIARY-OPENWRT-FIRMWARE
+          rc=$?
+          set -e
+          echo "gdown_rc=$rc"
+          count=$(find fu_7-CUDY-INTERMEDIARY-OPENWRT-FIRMWARE -type f | wc -l)
+          echo "downloaded_files=$count"
+          test "$count" -gt 0
 
       - name: Build manifest and hashes
         run: |
