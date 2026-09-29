@@ -9,6 +9,14 @@ on:
       - "cudy/**"
       - "bin/cudy-forensic.js"
       - "package.json"
+  pull_request:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/fu_6-c200p-capture.yml"
+      - "cudy/**"
+      - "bin/cudy-forensic.js"
+      - "package.json"
 
 jobs:
   c200p-full:
