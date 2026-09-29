@@ -1,0 +1,148 @@
+name: FU_7 Recover Archived P5 MediaFire Package
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-recover-p5-mediafire-archive.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Recover archived MediaFire direct links
+        shell: bash
+        run: |
+          set -e
+          python3 - <<'PY'
+          import os,re,json,html,csv,hashlib,urllib.parse,urllib.request
+
+          UA="Mozilla/5.0 OpenCudy-FU7-MediaFireArchive"
+          PAGE="https://www.mediafire.com/file/8h45jt668wlxx06/Upgrade_RM520.zip/file"
+          def fetch(u,timeout=90):
+            req=urllib.request.Request(u,headers={"User-Agent":UA,"Accept":"*/*"})
+            with urllib.request.urlopen(req,timeout=timeout) as r:
+              return r.read(),r.status,dict(r.headers)
+
+          params=[
+            ("url",PAGE),("output","json"),
+            ("fl","timestamp,original,statuscode,digest"),
+            ("filter","statuscode:200"),("collapse","digest")
+          ]
+          cdx="https://web.archive.org/cdx/search/cdx?"+urllib.parse.urlencode(params)
+          try:
+            b,_,_=fetch(cdx,120);d=json.loads(b.decode("utf-8","replace"))
+          except Exception as e:
+            print("CDX_FAIL",repr(e));d=[]
+          snaps=[]
+          if d:
+            h=d[0];snaps=[dict(zip(h,r)) for r in d[1:]]
+          print("SNAPS",len(snaps))
+
+          direct=[]
+          patterns=[
+            r'id=["\']downloadButton["\'][^>]*href=["\']([^"\']+)',
+            r'href=["\']([^"\']+)["\'][^>]*id=["\']downloadButton',
+            r'(https?://download[^"\'<>\s]+\.mediafire\.com/[^"\'<>\s]+)',
+            r'(https?://[^"\'<>\s]+\.mediafire\.com/[^"\'<>\s]*Upgrade_RM520\.zip[^"\'<>\s]*)'
+          ]
+          records=[]
+          for s in snaps:
+            ts=s.get("timestamp","")
+            if not ts:continue
+            arch=f"https://web.archive.org/web/{ts}id_/{PAGE}"
+            try:b,_,_=fetch(arch,60)
+            except Exception as e:
+              records.append({"timestamp":ts,"snapshot":arch,"link":"","result":"SNAP_FAIL:"+repr(e)});continue
+            txt=html.unescape(b.decode("utf-8","replace"))
+            found=[]
+            for pat in patterns:
+              for m in re.finditer(pat,txt,re.I):
+                u=m.group(1) if m.lastindex else m.group(0)
+                u=html.unescape(u)
+                if u not in found:found.append(u)
+            for u in found:
+              direct.append((ts,u))
+              records.append({"timestamp":ts,"snapshot":arch,"link":u,"result":"FOUND"})
+          with open("fu_7-P5-MEDIAFIRE-ARCHIVE-LINKS.csv","w",newline="",encoding="utf-8") as f:
+            w=csv.DictWriter(f,fieldnames=["timestamp","snapshot","link","result"]);w.writeheader();w.writerows(records)
+          print(json.dumps(direct,indent=2))
+
+          os.makedirs("fu_7-P5-MEDIAFIRE-RECOVERED",exist_ok=True)
+          recovered=[]
+          seen=set()
+          for ts,u in direct:
+            candidates=[u]
+            # Direct links themselves may also have been archived.
+            params=[("url",u),("output","json"),("fl","timestamp,original,statuscode"),("filter","statuscode:200")]
+            try:
+              bb,_,_=fetch("https://web.archive.org/cdx/search/cdx?"+urllib.parse.urlencode(params),70)
+              dd=json.loads(bb.decode("utf-8","replace"))
+              if dd:
+                hh=dd[0]
+                for rr in dd[1:]:
+                  oo=dict(zip(hh,rr)); tt=oo.get("timestamp",""); orig=oo.get("original","")
+                  if tt and orig:candidates.append(f"https://web.archive.org/web/{tt}id_/{orig}")
+            except:pass
+            for cu in candidates:
+              if cu in seen:continue
+              seen.add(cu)
+              try:data,st,h=fetch(cu,120)
+              except Exception:continue
+              sha=hashlib.sha256(data).hexdigest()
+              head=data[:1024].lower()
+              if len(data)<1024 or b"<html" in head or b"<!doctype" in head:continue
+              fn="Upgrade_RM520.zip"
+              p=os.path.join("fu_7-P5-MEDIAFIRE-RECOVERED",fn)
+              if os.path.exists(p):p=os.path.join("fu_7-P5-MEDIAFIRE-RECOVERED",sha[:8]+"-"+fn)
+              open(p,"wb").write(data)
+              recovered.append({"source":cu,"size":len(data),"sha256":sha,"saved_as":os.path.basename(p)})
+              print("RECOVERED",recovered[-1])
+              break
+            if recovered:break
+          json.dump({"snapshots":len(snaps),"direct_links":direct,"recovered":recovered},open("fu_7-P5-MEDIAFIRE-RECOVERY-SUMMARY.json","w"),indent=2)
+          PY
+
+      - name: Extract package if recovered and hash all contents
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p fu_7-P5-MEDIAFIRE-EXTRACTED
+          archive=$(find fu_7-P5-MEDIAFIRE-RECOVERED -type f -name '*.zip' | head -1 || true)
+          if [ -n "$archive" ]; then
+            unzip -o "$archive" -d fu_7-P5-MEDIAFIRE-EXTRACTED || true
+          fi
+          python3 - <<'PY'
+          import os,hashlib,csv,json
+          roots=["fu_7-P5-MEDIAFIRE-RECOVERED","fu_7-P5-MEDIAFIRE-EXTRACTED"]
+          rows=[]
+          for root in roots:
+            if not os.path.isdir(root):continue
+            for dp,_,fs in os.walk(root):
+              for fn in fs:
+                p=os.path.join(dp,fn);h=hashlib.sha256()
+                with open(p,"rb") as f:
+                  for b in iter(lambda:f.read(1024*1024),b""):h.update(b)
+                rows.append({"path":p,"size":os.path.getsize(p),"sha256":h.hexdigest()})
+          with open("fu_7-P5-MEDIAFIRE-MANIFEST.csv","w",newline="",encoding="utf-8") as f:
+            w=csv.DictWriter(f,fieldnames=["path","size","sha256"]);w.writeheader();w.writerows(rows)
+          json.dump(rows,open("fu_7-P5-MEDIAFIRE-MANIFEST.json","w"),indent=2)
+          print(json.dumps(rows,indent=2))
+          PY
+          zip -r -9 fu_7-P5-MEDIAFIRE-RECOVERY.zip             fu_7-P5-MEDIAFIRE-RECOVERED fu_7-P5-MEDIAFIRE-EXTRACTED             fu_7-P5-MEDIAFIRE-ARCHIVE-LINKS.csv fu_7-P5-MEDIAFIRE-RECOVERY-SUMMARY.json             fu_7-P5-MEDIAFIRE-MANIFEST.* || true
+
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-P5-MEDIAFIRE-RECOVERY
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            fu_7-P5-MEDIAFIRE-RECOVERY.zip
+            fu_7-P5-MEDIAFIRE-ARCHIVE-LINKS.csv
+            fu_7-P5-MEDIAFIRE-RECOVERY-SUMMARY.json
+            fu_7-P5-MEDIAFIRE-MANIFEST.csv
+            fu_7-P5-MEDIAFIRE-MANIFEST.json
