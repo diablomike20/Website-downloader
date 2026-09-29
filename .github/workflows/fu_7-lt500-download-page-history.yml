@@ -1,0 +1,31 @@
+name: FU_7 LT500 Download Page History
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - "scripts/fu_7_lt500_download_page_history.py"
+      - ".github/workflows/fu_7-lt500-download-page-history.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan archived LT500/LT500D download pages
+        run: python3 scripts/fu_7_lt500_download_page_history.py
+      - name: Summary
+        if: always()
+        run: cat fu_7-LT500-DOWNLOAD-PAGE-HISTORY-SUMMARY.json || true
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-LT500-DOWNLOAD-PAGE-HISTORY
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            fu_7-LT500-DOWNLOAD-PAGE-HISTORY.csv
+            fu_7-LT500-DOWNLOAD-PAGE-HISTORY-SUMMARY.json
