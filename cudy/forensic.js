@@ -273,12 +273,13 @@ function safeSegment(segment) {
 
 function outputPathForUrl(url, contentType, base) {
   const u = new URL(url);
+  const isDirectoryUrl = u.pathname.endsWith('/');
   const parts = u.pathname.split('/').filter(Boolean).map(safeSegment);
 
   if (base && (u.origin !== base.origin || !u.pathname.startsWith(base.pathname))) {
     parts.unshift('_external', safeSegment(u.hostname));
   }
-  let name = parts.pop() || 'index';
+  let name = isDirectoryUrl ? 'index' : (parts.pop() || 'index');
 
   if (u.search) {
     name += '__q_' + crypto.createHash('sha1').update(u.search).digest('hex').slice(0, 12);
