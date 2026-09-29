@@ -55,18 +55,31 @@ jobs:
           # uImage/kernel region up to SquashFS.
           dd if="$BIN" of=fu_6-components/fu_6-kernel-uimage-region.bin bs=1 skip="$UIMAGE_OFF" count=$((SQUASH_OFF-UIMAGE_OFF)) status=none
 
-          # SquashFS region. unsquashfs reads the filesystem length from the superblock.
-          dd if="$BIN" of=fu_6-components/fu_6-rootfs-with-trailing-data.squashfs bs=1 skip="$SQUASH_OFF" status=none
+          # Read exact SquashFS bytes_used from the v4 superblock (little endian, offset 40)
+          # so the extracted filesystem image does not include fwtool/trailer bytes.
+          FS_SIZE=$(python3 - "$BIN" "$SQUASH_OFF" <<'PY'
+import struct, sys
+p=sys.argv[1]
+off=int(sys.argv[2])
+with open(p,'rb') as f:
+    f.seek(off + 40)
+    print(struct.unpack('<Q', f.read(8))[0])
+PY
+          )
+          echo "SQUASHFS_BYTES_USED=$FS_SIZE" >> fu_6-layout.txt
+
+          dd if="$BIN" of=fu_6-components/fu_6-rootfs.squashfs bs=1 skip="$SQUASH_OFF" count="$FS_SIZE" status=none
 
           # Known fwtool/trailer region from the live layout correlation.
           dd if="$BIN" of=fu_6-components/fu_6-fwtool-trailer.bin bs=1 skip="$TRAILER_OFF" status=none
 
-          unsquashfs -s fu_6-components/fu_6-rootfs-with-trailing-data.squashfs | tee fu_6-squashfs-superblock.txt
-          mkdir -p fu_6-rootfs
-          unsquashfs -f -d fu_6-rootfs fu_6-components/fu_6-rootfs-with-trailing-data.squashfs
+          unsquashfs -s fu_6-components/fu_6-rootfs.squashfs | tee fu_6-squashfs-superblock.txt
+          sudo rm -rf fu_6-rootfs
+          sudo unsquashfs -f -d fu_6-rootfs fu_6-components/fu_6-rootfs.squashfs
 
-          # Preserve symlinks, modes, owners numerically and special file metadata where tar can represent it.
-          tar --numeric-owner -czf fu_6-C200P-R74-2.5.14-rootfs.tar.gz fu_6-rootfs
+          # Preserve symlinks, numeric ownership, modes and device nodes inside tar.
+          sudo tar --numeric-owner -czf fu_6-C200P-R74-2.5.14-rootfs.tar.gz fu_6-rootfs
+          sudo chown "$(id -u):$(id -g)" fu_6-C200P-R74-2.5.14-rootfs.tar.gz
 
           sha256sum fu_6-source.zip "$BIN" fu_6-components/* fu_6-C200P-R74-2.5.14-rootfs.tar.gz             | tee fu_6-sha256sums.txt
 
@@ -75,11 +88,16 @@ jobs:
             file fu_6-source.zip "$BIN" fu_6-components/*
             echo
             echo "=== rootfs top level ==="
-            find fu_6-rootfs -maxdepth 2 -printf '%y %p -> %l\n' | sort | head -500
+            sudo find fu_6-rootfs -maxdepth 2 -printf '%y %p -> %l\n' | sort | head -500
             echo
             echo "=== selected identity strings ==="
-            grep -RIna -m20 -E '2\.5\.14-20260618-150931|C200P|R74' fu_6-rootfs/etc fu_6-rootfs/usr 2>/dev/null || true
+            sudo grep -RIna -m20 -E '2\.5\.14-20260618-150931|C200P|R74' fu_6-rootfs/etc fu_6-rootfs/usr 2>/dev/null || true
           } | tee fu_6-unpack-report.txt
+
+          # The tarball is the faithful rootfs export, including special device nodes.
+          # Remove the expanded rootfs before artifact upload because upload-artifact
+          # only handles regular filesystem entries reliably.
+          sudo rm -rf fu_6-rootfs
 
           # Remove duplicate original ZIP/BIN from the final unpack package; checksums/layout remain.
           rm -rf fu_6-source fu_6-source.zip
