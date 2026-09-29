@@ -41,14 +41,15 @@ function help() {
     'Options:',
     '  --url URL',
     '  --output DIR',
-    '  --max-requests N    default: 2500',
-    '  --max-bytes N       default: 67108864',
-    '  --delay-ms N        default: 100',
-    '  --timeout-ms N      default: 20000',
+    '  --max-requests N    default: 0 (unlimited)',
+    '  --max-bytes N       default: 0 (unlimited)',
+    '  --delay-ms N        default: 0',
+    '  --timeout-ms N      default: 0 (no artificial timeout)',
     '',
     'Safety:',
-    '  GET only, same emulator subtree only, destructive routes skipped,',
-    '  no auth bypass, brute force, version guessing, timestamp spraying or POST.'
+    '  Full asset capture by default. GET only, same emulator subtree recursively.',
+    '  Live destructive actions are not invoked; their public static emulator snapshots are kept.',
+    '  No auth bypass, brute force, version guessing, timestamp spraying or POST.'
   ].join('\n'));
 }
 
