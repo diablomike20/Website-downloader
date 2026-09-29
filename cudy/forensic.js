@@ -20,6 +20,7 @@ const LUCI_RE = /["'`](\/?(?:cgi-bin\/luci|admin)\/[A-Za-z0-9_./%?=&:+-]+)["'`]/
 const ABSOLUTE_LUCI_RE = /(?:https?:\/\/[^\s"'<>]+)?(?:\/emulator\/[^\s"'<>/]+)?\/cgi-bin\/luci\/[A-Za-z0-9_./%?=&:+-]+/gi;
 const STATIC_RE = /["'`](\.\/?cgi-bin\/luci\/[A-Za-z0-9_./%?=&:+-]+\.html)["'`]/g;
 const JQ_POST_RE = /\$\.post\(\s*["'`]([^"'`]+)["'`]\s*,\s*\{([^}]*)\}/g;
+const CLOUD_API_RE = /["'`](v\d+\/[A-Za-z0-9_./-]+)["'`]/g;
 const SIMPLE_PAIR_RE = /([A-Za-z0-9_.-]+)\s*:\s*["'`]([^"'`]*)["'`]/g;
 const QUOTED_ASSET_RE = /["'`]((?:(?:https?:)?\/\/|\.{0,2}\/|\/)?[A-Za-z0-9_@%+~.,\/-]+\.(?:js|css|mjs|cjs|json|map|wasm|png|jpe?g|gif|svg|webp|avif|ico|bmp|woff2?|ttf|otf|eot|mp4|webm|mp3|wav|ogg)(?:\?[^"'`]*)?)["'`]/gi;
 
@@ -265,6 +266,18 @@ function extractReferences(text, contentType, pageUrl, base) {
     const bodyQuery = bodyPairsToQuery(match[2]);
     const staticUrl = toStaticEmulatorUrl(route, pageUrl, base, bodyQuery);
     if (staticUrl) mapped.add(staticUrl);
+  }
+
+  // AC_Cloud is a SPA whose public emulator bootstrap rewrites requests to
+  // i18n-wapi-test.cudycloud.com/web/v1/... into ./mock_api/web/v1/...json.
+  // Preserve those static mock responses as part of the offline UI.
+  if (/\/emulator\/AC_Cloud\/$/i.test(base.pathname)) {
+    CLOUD_API_RE.lastIndex = 0;
+    while ((match = CLOUD_API_RE.exec(scanText))) {
+      try {
+        urls.add(new URL('mock_api/web/' + match[1] + '.json', base).href);
+      } catch (_) {}
+    }
   }
 
   return { urls, routes, mapped };
