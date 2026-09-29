@@ -20,6 +20,7 @@ const LUCI_RE = /["'`](\/?(?:cgi-bin\/luci|admin)\/[A-Za-z0-9_./%?=&:+-]+)["'`]/
 const ABSOLUTE_LUCI_RE = /(?:https?:\/\/[^\s"'<>]+)?(?:\/emulator\/[^\s"'<>/]+)?\/cgi-bin\/luci\/[A-Za-z0-9_./%?=&:+-]+/gi;
 const STATIC_RE = /["'`](\.\/?cgi-bin\/luci\/[A-Za-z0-9_./%?=&:+-]+\.html)["'`]/g;
 const JQ_POST_RE = /\$\.post\(\s*["'`]([^"'`]+)["'`]\s*,\s*\{([^}]*)\}/g;
+const CBI_XHR_LOAD_RE = /cbi_xhr_load\(\s*["'`][^"'`]*["'`]\s*,\s*["'`][^"'`]*["'`]\s*,\s*["'`]([^"'`]+)["'`]\s*,\s*["'`]([^"'`]*)["'`]/g;
 const CLOUD_API_RE = /["'`](v\d+\/[A-Za-z0-9_./-]+)["'`]/g;
 const SIMPLE_PAIR_RE = /([A-Za-z0-9_.-]+)\s*:\s*["'`]([^"'`]*)["'`]/g;
 const QUOTED_ASSET_RE = /["'`]((?:(?:https?:)?\/\/|\.{0,2}\/|\/)?[A-Za-z0-9_@%+~.,\/-]+\.(?:js|css|mjs|cjs|json|map|wasm|png|jpe?g|gif|svg|webp|avif|ico|bmp|woff2?|ttf|otf|eot|mp4|webm|mp3|wav|ogg)(?:\?[^"'`]*)?)["'`]/gi;
@@ -265,6 +266,19 @@ function extractReferences(text, contentType, pageUrl, base) {
     routes.add(route);
     const bodyQuery = bodyPairsToQuery(match[2]);
     const staticUrl = toStaticEmulatorUrl(route, pageUrl, base, bodyQuery);
+    if (staticUrl) mapped.add(staticUrl);
+  }
+
+  // cbi_xhr_load() carries GET/POST parameters separately from the URL.
+  // The Cudy emulator mapper folds that data string into the static filename,
+  // so preserving it is required for views such as autoupgrade?updatecheck=&nomodal=.
+  CBI_XHR_LOAD_RE.lastIndex = 0;
+  while ((match = CBI_XHR_LOAD_RE.exec(scanText))) {
+    const route = normalizeLuciUrl(match[1], pageUrl, base);
+    if (!route) continue;
+
+    routes.add(route);
+    const staticUrl = toStaticEmulatorUrl(route, pageUrl, base, match[2] || '');
     if (staticUrl) mapped.add(staticUrl);
   }
 
