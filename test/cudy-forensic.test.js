@@ -228,3 +228,22 @@ run('captures AC_Cloud mock API paths from SPA chunks', function () {
     true
   );
 });
+
+
+run('captures cbi_xhr_load data-specific snapshots', function () {
+  const page = 'https://support.cudy.com/emulator/LT500/cgi-bin/luci/admin/system/autoupgrade.html';
+  const base = emulatorBaseFromUrl(page);
+  const html = 'cbi_xhr_load("#tab-config-autoupgrade", "get", "/emulator/LT500/cgi-bin/luci/admin/system/autoupgrade", "updatecheck=&nomodal=");';
+
+  const refs = require('../cudy/forensic').extractReferences(
+    html,
+    'text/html; charset=utf-8',
+    page,
+    base
+  );
+
+  assert.strictEqual(
+    refs.mapped.has('https://support.cudy.com/emulator/LT500/cgi-bin/luci/admin/system/autoupgrade/updatecheck/nomodal.html'),
+    true
+  );
+});
