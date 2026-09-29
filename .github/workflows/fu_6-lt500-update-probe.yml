@@ -1,0 +1,29 @@
+name: fu_6 LT500 autoupgrade static probe
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_6-lt500-update-probe.yml"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe deterministic emulator snapshot paths
+        shell: bash
+        run: |
+          set -u
+          urls=(
+            "https://support.cudy.com/emulator/LT500/cgi-bin/luci/admin/system/autoupgrade/updatecheck/nomodal.html"
+            "https://support.cudy.com/emulator/C200P/cgi-bin/luci/admin/system/autoupgrade/updatecheck/nomodal.html"
+          )
+          for url in "${urls[@]}"; do
+            echo "=== $url ==="
+            code=$(curl -L -sS -o /tmp/body -w "%{http_code}" "$url" || true)
+            echo "HTTP $code"
+            wc -c /tmp/body || true
+            cat /tmp/body || true
+            echo
+          done
