@@ -1,0 +1,35 @@
+name: FU_7 R25 LT500 CDN Hunt
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - "scripts/fu_7_r25_lt500_cdn_hunt.py"
+      - ".github/workflows/fu_7-r25-lt500-cdn-hunt.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Targeted R25 LT500 CDN index hunt
+        run: python3 scripts/fu_7_r25_lt500_cdn_hunt.py
+      - name: Results
+        if: always()
+        run: |
+          cat fu_7-R25-LT500-CDN-SUMMARY.json || true
+          echo "=== CSP2.5 hits ==="
+          cat fu_7-R25-LT500-CSP25-HITS.csv || true
+      - name: Upload hunt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-R25-LT500-CDN-HUNT
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            fu_7-R25-LT500-CDN-INDEX.csv
+            fu_7-R25-LT500-CSP25-HITS.csv
+            fu_7-R25-LT500-CDN-SUMMARY.json
