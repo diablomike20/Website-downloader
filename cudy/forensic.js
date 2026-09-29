@@ -20,6 +20,16 @@ const LUCI_RE = /["'`](\/?(?:cgi-bin\/luci|admin)\/[A-Za-z0-9_./%?=&:+-]+)["'`]/
 const STATIC_RE = /["'`](\.\/?cgi-bin\/luci\/[A-Za-z0-9_./%?=&:+-]+\.html)["'`]/g;
 const JQ_POST_RE = /\$\.post\(\s*["'`]([^"'`]+)["'`]\s*,\s*\{([^}]*)\}/g;
 const SIMPLE_PAIR_RE = /([A-Za-z0-9_.-]+)\s*:\s*["'`]([^"'`]*)["'`]/g;
+const QUOTED_ASSET_RE = /["'`]((?:(?:https?:)?\/\/|\.{0,2}\/|\/)?[A-Za-z0-9_@%+~.,\/-]+\.(?:js|css|mjs|cjs|json|map|wasm|png|jpe?g|gif|svg|webp|avif|ico|bmp|woff2?|ttf|otf|eot|mp4|webm|mp3|wav|ogg)(?:\?[^"'`]*)?)["'`]/gi;
+
+const COMMON_UI_SEEDS = [
+  'cgi-bin/luci/admin/setup.html',
+  'cgi-bin/luci/admin/dashboard',
+  'cgi-bin/luci/admin/network/devices',
+  'cgi-bin/luci/admin/network/wireless/wds/wisp',
+  'cgi-bin/luci/admin/system/autoupgrade',
+  'cgi-bin/luci/admin/system/status/syslog'
+];
 
 function sha256(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
@@ -211,6 +221,12 @@ function extractReferences(text, contentType, pageUrl, base) {
 
   STATIC_RE.lastIndex = 0;
   while ((match = STATIC_RE.exec(scanText))) addUrl(match[1]);
+
+  // Bundlers such as Vite/Webpack keep lazy chunks, locale packs, images and
+  // fonts as quoted strings inside JavaScript. Those are part of the offline
+  // UI even when they are not present as HTML href/src attributes.
+  QUOTED_ASSET_RE.lastIndex = 0;
+  while ((match = QUOTED_ASSET_RE.exec(scanText))) addUrl(match[1]);
 
   LUCI_RE.lastIndex = 0;
   while ((match = LUCI_RE.exec(scanText))) {
@@ -425,6 +441,14 @@ async function crawl(options) {
 
   enqueue(start, 'seed');
   enqueue(base.href, 'emulator-root');
+
+  // Many legacy Cudy emulators expose a login page at the model root while
+  // their public admin snapshots remain directly readable. Seed known,
+  // documented/common UI entry points so the crawler reaches the menu graph
+  // without submitting credentials or invoking actions.
+  if (model !== 'AC_Cloud') {
+    COMMON_UI_SEEDS.forEach((rel) => enqueue(new URL(rel, base).href, 'common-ui-seed'));
+  }
 
   while (queue.length && visited.size < settings.maxRequests) {
     if (typeof options.shouldCancel === 'function' && options.shouldCancel()) {
