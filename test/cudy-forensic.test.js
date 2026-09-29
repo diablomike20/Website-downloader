@@ -1,7 +1,6 @@
 'use strict';
 
-const test = require('node:test');
-const assert = require('node:assert/strict');
+const assert = require('assert');
 
 const {
   mapQueryPath,
@@ -11,18 +10,28 @@ const {
   bodyPairsToQuery
 } = require('../cudy/forensic');
 
-test('maps Cudy query path exactly', () => {
-  assert.equal(
+function run(name, fn) {
+  try {
+    fn();
+    console.log('PASS ' + name);
+  } catch (err) {
+    console.error('FAIL ' + name);
+    throw err;
+  }
+}
+
+run('maps Cudy query path exactly', function () {
+  assert.strictEqual(
     mapQueryPath('cgi-bin/luci/admin/system/autoupgrade?updatecheck=&nomodal='),
     'cgi-bin/luci/admin/system/autoupgrade/updatecheck/nomodal'
   );
 });
 
-test('maps LuCI URL into static emulator snapshot', () => {
+run('maps LuCI URL into static emulator snapshot', function () {
   const page = 'https://support.cudy.com/emulator/C200P/cgi-bin/luci/admin/system/autoupgrade.html';
   const base = emulatorBaseFromUrl(page);
 
-  assert.equal(
+  assert.strictEqual(
     luciStaticRelative(
       '/cgi-bin/luci/admin/system/autoupgrade?updatecheck=&nomodal=',
       page,
@@ -33,13 +42,13 @@ test('maps LuCI URL into static emulator snapshot', () => {
   );
 });
 
-test('maps simple $.post body into snapshot path', () => {
+run('maps simple $.post body into snapshot path', function () {
   const page = 'https://support.cudy.com/emulator/C200P/cgi-bin/luci/admin/system/autoupgrade.html';
   const base = emulatorBaseFromUrl(page);
   const body = bodyPairsToQuery("token: 'abc123'");
 
-  assert.equal(body, 'token=abc123');
-  assert.equal(
+  assert.strictEqual(body, 'token=abc123');
+  assert.strictEqual(
     luciStaticRelative(
       '/cgi-bin/luci/admin/system/autoupgrade/updatecheck',
       page,
@@ -50,12 +59,12 @@ test('maps simple $.post body into snapshot path', () => {
   );
 });
 
-test('scope lock stays inside one emulator model', () => {
+run('scope lock stays inside one emulator model', function () {
   const base = emulatorBaseFromUrl(
     'https://support.cudy.com/emulator/C200P/cgi-bin/luci/admin/setup.html'
   );
 
-  assert.equal(
+  assert.strictEqual(
     sameEmulatorScope(
       'https://support.cudy.com/emulator/C200P/luci-static/light/js/cbi.js',
       base
@@ -63,7 +72,7 @@ test('scope lock stays inside one emulator model', () => {
     true
   );
 
-  assert.equal(
+  assert.strictEqual(
     sameEmulatorScope(
       'https://support.cudy.com/emulator/TR3000/',
       base
@@ -71,3 +80,5 @@ test('scope lock stays inside one emulator model', () => {
     false
   );
 });
+
+console.log('fu_6 Cudy forensic mapper tests complete.');
