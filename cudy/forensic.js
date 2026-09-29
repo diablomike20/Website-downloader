@@ -789,5 +789,7 @@ module.exports = {
   luciStaticRelative,
   toStaticEmulatorUrl,
   extractReferences,
-  bodyPairsToQuery
+  bodyPairsToQuery,
+  outputPathForUrl,
+  disambiguateOutputPath
 };
