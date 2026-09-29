@@ -1,0 +1,77 @@
+name: FU_7 Download Cudy Intermediary Drive
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-download-cudy-intermediary-drive.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Install downloader
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install "gdown>=5.2.0"
+
+      - name: Download complete public Cudy intermediary folder
+        run: |
+          set -e
+          mkdir -p fu_7-CUDY-INTERMEDIARY-OPENWRT-FIRMWARE
+          gdown --folder --remaining-ok             "https://drive.google.com/drive/folders/1BKVarlwlNxf7uJUtRhuMGUqeCa5KpMnj?usp=sharing"             -O fu_7-CUDY-INTERMEDIARY-OPENWRT-FIRMWARE
+
+      - name: Build manifest and hashes
+        run: |
+          set -e
+          python3 - <<'PY'
+          import os,hashlib,json,csv
+          root="fu_7-CUDY-INTERMEDIARY-OPENWRT-FIRMWARE"
+          rows=[]
+          for dp,_,fs in os.walk(root):
+              for fn in fs:
+                  p=os.path.join(dp,fn)
+                  h=hashlib.sha256()
+                  with open(p,"rb") as f:
+                      for c in iter(lambda:f.read(1024*1024),b""):
+                          h.update(c)
+                  rows.append({
+                      "path":os.path.relpath(p,root),
+                      "size":os.path.getsize(p),
+                      "sha256":h.hexdigest()
+                  })
+          rows.sort(key=lambda x:x["path"].lower())
+          with open("fu_7-CUDY-INTERMEDIARY-OPENWRT-MANIFEST.csv","w",newline="",encoding="utf-8") as f:
+              w=csv.DictWriter(f,fieldnames=["path","size","sha256"]);w.writeheader();w.writerows(rows)
+          with open("fu_7-CUDY-INTERMEDIARY-OPENWRT-MANIFEST.json","w",encoding="utf-8") as f:
+              json.dump(rows,f,indent=2,ensure_ascii=False)
+          summary={
+              "files":len(rows),
+              "bytes":sum(x["size"] for x in rows),
+              "firmware_like":[x for x in rows if x["path"].lower().endswith((".bin",".img",".trx",".tar",".gz",".zip",".itb"))]
+          }
+          with open("fu_7-CUDY-INTERMEDIARY-OPENWRT-SUMMARY.json","w",encoding="utf-8") as f:
+              json.dump(summary,f,indent=2,ensure_ascii=False)
+          print(json.dumps({"files":summary["files"],"bytes":summary["bytes"],"firmware_like":len(summary["firmware_like"])},indent=2))
+          for x in summary["firmware_like"]:
+              print(x["path"],x["size"],x["sha256"])
+          PY
+
+      - name: Pack collection
+        run: |
+          zip -r -9 fu_7-CUDY-INTERMEDIARY-OPENWRT-FIRMWARE.zip             fu_7-CUDY-INTERMEDIARY-OPENWRT-FIRMWARE             fu_7-CUDY-INTERMEDIARY-OPENWRT-MANIFEST.csv             fu_7-CUDY-INTERMEDIARY-OPENWRT-MANIFEST.json             fu_7-CUDY-INTERMEDIARY-OPENWRT-SUMMARY.json
+
+      - name: Upload collection
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-CUDY-INTERMEDIARY-OPENWRT-FIRMWARE
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+          path: |
+            fu_7-CUDY-INTERMEDIARY-OPENWRT-FIRMWARE.zip
+            fu_7-CUDY-INTERMEDIARY-OPENWRT-MANIFEST.csv
+            fu_7-CUDY-INTERMEDIARY-OPENWRT-MANIFEST.json
+            fu_7-CUDY-INTERMEDIARY-OPENWRT-SUMMARY.json
