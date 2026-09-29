@@ -1,0 +1,134 @@
+name: FU_7 4PDA Cudy Beta Attachment Hunt
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-4pda-cudy-beta-attachments.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Scan known Cudy 4PDA topics and download beta/dev attachments
+        shell: bash
+        run: |
+          set -e
+          python3 - <<'PY'
+          import os,re,html,json,csv,hashlib,time,urllib.parse,urllib.request
+
+          UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 OpenCudy-FU7"
+          TOPICS=[
+            ("WR3600_WR3600H",1103718,0,900),
+            ("WR3000",1087457,0,1800),
+            ("LT300_FAMILY",1109448,0,900),
+            ("CUDY_MISC_1104378",1104378,0,600),
+          ]
+          # Strong dev/beta markers; 4PDA attachment anchors include filename.
+          DEV_RE=re.compile(r'(?i)(beta|\d+b(?:-|\.|_)|test|debug|dev|cellularupgrade|upgrade-module|without[ _-]*recovery|intermed|recovery)')
+          FW_RE=re.compile(r'(?i)\.(?:bin|zip|img|trx|itb)(?:$|\?)')
+          A_RE=re.compile(r'<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',re.I|re.S)
+          URL_RE=re.compile(r'(?i)(?://)?4pda\.to/forum/dl/post/\d+/[^"\'<>\s]+')
+
+          def fetch(url,timeout=35):
+            req=urllib.request.Request(url,headers={"User-Agent":UA,"Accept-Language":"ru,en;q=0.8"})
+            with urllib.request.urlopen(req,timeout=timeout) as r:
+              data=r.read()
+              return data,r.status,dict(r.headers)
+
+          links={}
+          pages_ok=0
+          for label,topic,start,end in TOPICS:
+            empty=0
+            for st in range(start,end+1,20):
+              u=f"https://4pda.to/forum/index.php?showtopic={topic}&st={st}"
+              try:
+                data,_,_=fetch(u,35)
+              except Exception as e:
+                print("PAGE_FAIL",label,st,repr(e))
+                empty+=1
+                if empty>=8 and st>100: break
+                continue
+              empty=0;pages_ok+=1
+              # Decode best-effort.
+              txt=None
+              for enc in ("utf-8","cp1251","latin1"):
+                try: txt=data.decode(enc); break
+                except: pass
+              if txt is None: txt=data.decode("utf-8","replace")
+              txt=html.unescape(txt)
+
+              for m in A_RE.finditer(txt):
+                href=m.group(1)
+                labeltxt=re.sub(r'<[^>]+>',' ',m.group(2))
+                labeltxt=re.sub(r'\s+',' ',html.unescape(labeltxt)).strip()
+                full=urllib.parse.urljoin(u,href)
+                combo=(full+" "+labeltxt)
+                if ("4pda.to/forum/dl/post/" in full or "/forum/dl/post/" in full) and FW_RE.search(full.split("#")[0]):
+                  if DEV_RE.search(combo):
+                    links[full]={"topic":label,"page":u,"label":labeltxt}
+              # Some attachments may be plaintext outside anchors.
+              for mm in re.finditer(r'(?i)(?://4pda\.to)?/forum/dl/post/\d+/[^"\'<>\s]+',txt):
+                href=mm.group(0)
+                full=urllib.parse.urljoin(u,href)
+                around=txt[max(0,mm.start()-250):mm.end()+250]
+                plain=re.sub(r'<[^>]+>',' ',around)
+                if FW_RE.search(full.split("#")[0]) and DEV_RE.search(full+" "+plain):
+                  links.setdefault(full,{"topic":label,"page":u,"label":re.sub(r'\s+',' ',plain).strip()})
+              if st%200==0: print("PROGRESS",label,st,"links",len(links))
+              time.sleep(.08)
+
+          # Seed exact known beta filenames by searching the topic HTML/link context is preferred;
+          # no generated URL guessing is done here.
+          os.makedirs("fu_7-4PDA-CUDY-BETA-ATTACHMENTS",exist_ok=True)
+          rows=[]
+          for idx,(url,meta) in enumerate(sorted(links.items()),1):
+            try:
+              data,st,h=fetch(url,120)
+            except Exception as e:
+              rows.append({"topic":meta["topic"],"page":meta["page"],"label":meta["label"],"url":url,"result":"FAIL:"+repr(e),"filename":"","size":"","sha256":""})
+              continue
+            # content-disposition filename, else URL basename
+            cd=h.get("Content-Disposition","")
+            fn=""
+            mm=re.search(r'filename\*?=(?:UTF-8\'\')?["\']?([^;"\']+)',cd,re.I)
+            if mm: fn=urllib.parse.unquote(mm.group(1).strip())
+            if not fn: fn=urllib.parse.unquote(urllib.parse.urlsplit(url).path.rsplit("/",1)[-1])
+            fn=re.sub(r'[^A-Za-z0-9._()+ -]','_',fn) or f"attachment-{idx}.bin"
+            sha=hashlib.sha256(data).hexdigest()
+            head=data[:1024].lower()
+            if len(data)<1024 or b"<html" in head or b"<!doctype" in head:
+              rows.append({"topic":meta["topic"],"page":meta["page"],"label":meta["label"],"url":url,"result":"NON_BINARY","filename":fn,"size":len(data),"sha256":sha})
+              continue
+            p=os.path.join("fu_7-4PDA-CUDY-BETA-ATTACHMENTS",fn)
+            if os.path.exists(p): p=os.path.join("fu_7-4PDA-CUDY-BETA-ATTACHMENTS",sha[:8]+"-"+fn)
+            open(p,"wb").write(data)
+            rows.append({"topic":meta["topic"],"page":meta["page"],"label":meta["label"],"url":url,"result":"SAVED","filename":os.path.basename(p),"size":len(data),"sha256":sha})
+            print("SAVED",meta["topic"],os.path.basename(p),len(data),sha,url)
+
+          fields=["topic","page","label","url","result","filename","size","sha256"]
+          with open("fu_7-4PDA-CUDY-BETA-MANIFEST.csv","w",newline="",encoding="utf-8") as f:
+            w=csv.DictWriter(f,fieldnames=fields);w.writeheader();w.writerows(rows)
+          summary={"pages_ok":pages_ok,"candidate_links":len(links),"saved":[r for r in rows if r["result"]=="SAVED"],"failed":[r for r in rows if r["result"]!="SAVED"]}
+          open("fu_7-4PDA-CUDY-BETA-SUMMARY.json","w",encoding="utf-8").write(json.dumps(summary,indent=2,ensure_ascii=False))
+          print(json.dumps(summary,indent=2,ensure_ascii=False))
+          PY
+
+      - name: Pack
+        if: always()
+        run: |
+          zip -r -9 fu_7-4PDA-CUDY-BETA-ATTACHMENTS.zip             fu_7-4PDA-CUDY-BETA-ATTACHMENTS             fu_7-4PDA-CUDY-BETA-MANIFEST.csv             fu_7-4PDA-CUDY-BETA-SUMMARY.json || true
+
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-4PDA-CUDY-BETA-ATTACHMENTS
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            fu_7-4PDA-CUDY-BETA-ATTACHMENTS.zip
+            fu_7-4PDA-CUDY-BETA-MANIFEST.csv
+            fu_7-4PDA-CUDY-BETA-SUMMARY.json
