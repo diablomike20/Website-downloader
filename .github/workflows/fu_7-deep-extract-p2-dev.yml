@@ -7,45 +7,55 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 jobs:
   extract:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - name: Install MEGA tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y megatools p7zip-full
-
-      - name: Download current P2 support packages
+      - name: Download previously collected P2 artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -e
-          mkdir -p fu_7-P2-DEEP/raw
-          megadl --path="fu_7-P2-DEEP/raw" "https://mega.nz/file/6VYiELhI#Nk4gl8Jzy52sZ3KKoJFpGPPalW7s9Khtd_lzYXzjqkA"
-          megadl --path="fu_7-P2-DEEP/raw" "https://mega.nz/file/qNgxhC6I#MdYFH7peRO6bTTf6Eas1qX8LlhEMR1VUBQ89JcXyUL8"
+          mkdir -p previous
+          gh run download 36638903516             --repo "${{ github.repository }}"             --name fu_7-CUDYFORUM-P2-DEV             --dir previous
+          find previous -maxdepth 2 -type f -printf '%p %s bytes\n'
 
-      - name: Recursively extract archives and hash every file
+      - name: Unpack prior artifact and recursively extract nested packages
         shell: bash
         run: |
           set -e
+          sudo apt-get update >/dev/null
+          sudo apt-get install -y p7zip-full >/dev/null
+          mkdir -p fu_7-P2-DEEP/input fu_7-P2-DEEP/extracted
+
+          # The prior artifact contains the collection ZIP plus manifests.
+          find previous -maxdepth 2 -type f -name '*.zip' -print0 | while IFS= read -r -d '' z; do
+            unzip -o "$z" -d fu_7-P2-DEEP/input >/dev/null || true
+          done
+
           python3 - <<'PY'
-          import os,zipfile,tarfile,hashlib,csv,json,shutil,subprocess
+          import os,zipfile,tarfile,hashlib,csv,json,subprocess,shutil
           root="fu_7-P2-DEEP"
-          raw=os.path.join(root,"raw")
+          inp=os.path.join(root,"input")
           ext=os.path.join(root,"extracted")
-          os.makedirs(ext,exist_ok=True)
-
           queue=[]
-          for fn in os.listdir(raw):
-              p=os.path.join(raw,fn)
-              if os.path.isfile(p): queue.append((p,os.path.join(ext,fn+"_contents")))
+          for dp,_,fs in os.walk(inp):
+              for fn in fs:
+                  p=os.path.join(dp,fn)
+                  if fn.lower().endswith((".zip",".7z",".tar",".tgz",".tar.gz")):
+                      queue.append(p)
+
           seen=set()
           while queue:
-              src,dst=queue.pop(0)
+              src=queue.pop(0)
               key=os.path.abspath(src)
               if key in seen: continue
               seen.add(key)
+              rel=os.path.relpath(src,inp).replace(os.sep,"__")
+              dst=os.path.join(ext,rel+"_contents")
               os.makedirs(dst,exist_ok=True)
               ok=False
               try:
@@ -58,18 +68,15 @@ jobs:
               except Exception as e:
                   print("PY_EXTRACT_FAIL",src,repr(e))
               if not ok:
-                  try:
-                      cp=subprocess.run(["7z","x","-y",f"-o{dst}",src],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
-                      ok=(cp.returncode==0)
-                      if not ok: print("7Z_FAIL",src,cp.stdout[-1000:])
-                  except Exception as e: print("7Z_EXCEPTION",src,repr(e))
+                  cp=subprocess.run(["7z","x","-y",f"-o{dst}",src],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
+                  ok=(cp.returncode==0)
+                  if not ok: print("7Z_FAIL",src,cp.stdout[-1000:])
               if ok:
                   for dp,_,fs in os.walk(dst):
                       for fn in fs:
                           p=os.path.join(dp,fn)
-                          lo=fn.lower()
-                          if lo.endswith((".zip",".7z",".tar",".tgz",".tar.gz")):
-                              queue.append((p,p+"_contents"))
+                          if fn.lower().endswith((".zip",".7z",".tar",".tgz",".tar.gz")):
+                              queue.append(p)
 
           rows=[]
           for dp,_,fs in os.walk(root):
