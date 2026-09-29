@@ -30,6 +30,16 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function decodeHtmlForDiscovery(text) {
+  return String(text || '')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>');
+}
+
 function unlimitedNumber(value) {
   if (value == null || value === '' || Number(value) <= 0) return Infinity;
   return Number(value);
@@ -178,7 +188,7 @@ function extractReferences(text, contentType, pageUrl, base) {
 
   let documentBase = pageUrl;
   if (/html/i.test(contentType)) {
-    const baseMatch = HTML_BASE_RE.exec(text);
+    const baseMatch = HTML_BASE_RE.exec(scanText);
     if (baseMatch) {
       try { documentBase = new URL(baseMatch[1], pageUrl).href; } catch (_) {}
     }
@@ -192,16 +202,16 @@ function extractReferences(text, contentType, pageUrl, base) {
   let match;
 
   ATTR_RE.lastIndex = 0;
-  while ((match = ATTR_RE.exec(text))) addUrl(match[1]);
+  while ((match = ATTR_RE.exec(scanText))) addUrl(match[1]);
 
   CSS_URL_RE.lastIndex = 0;
-  while ((match = CSS_URL_RE.exec(text))) addUrl(match[1]);
+  while ((match = CSS_URL_RE.exec(scanText))) addUrl(match[1]);
 
   STATIC_RE.lastIndex = 0;
-  while ((match = STATIC_RE.exec(text))) addUrl(match[1]);
+  while ((match = STATIC_RE.exec(scanText))) addUrl(match[1]);
 
   LUCI_RE.lastIndex = 0;
-  while ((match = LUCI_RE.exec(text))) {
+  while ((match = LUCI_RE.exec(scanText))) {
     const route = normalizeLuciUrl(match[1], pageUrl, base);
     if (!route) continue;
 
@@ -214,7 +224,7 @@ function extractReferences(text, contentType, pageUrl, base) {
   // The emulator shim can map POST bodies to static path elements.
   // We never send the POST. We only derive the corresponding static GET.
   JQ_POST_RE.lastIndex = 0;
-  while ((match = JQ_POST_RE.exec(text))) {
+  while ((match = JQ_POST_RE.exec(scanText))) {
     const route = normalizeLuciUrl(match[1], pageUrl, base);
     if (!route) continue;
 
