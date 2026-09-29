@@ -158,3 +158,50 @@ run('keeps extensionless and .html URL responses distinct', function () {
   assert.notStrictEqual(a, b2);
   assert.ok(/__u_[0-9a-f]{12}\.html$/.test(b2));
 });
+
+
+run('preserves real image and font extensions when cache-busting query strings are present', function () {
+  const base = emulatorBaseFromUrl(
+    'https://support.cudy.com/emulator/C200P/'
+  );
+
+  const png = outputPathForUrl(
+    'https://support.cudy.com/emulator/C200P/luci-static/light/img/logo-blue.png?v=git-26.169.24995-88fd143',
+    'image/png',
+    base
+  );
+  const svg = outputPathForUrl(
+    'https://support.cudy.com/emulator/C200P/luci-static/resources/logo.svg?v=git-26.169.24995-88fd143',
+    'image/svg+xml',
+    base
+  );
+  const woff2 = outputPathForUrl(
+    'https://support.cudy.com/emulator/C200P/luci-static/light/css/iconfont.woff2?v=git-26.169.24995-88fd143',
+    'font/woff2',
+    base
+  );
+
+  assert.ok(/logo-blue__q_[0-9a-f]{12}\.png$/.test(png), png);
+  assert.ok(/logo__q_[0-9a-f]{12}\.svg$/.test(svg), svg);
+  assert.ok(/iconfont__q_[0-9a-f]{12}\.woff2$/.test(woff2), woff2);
+  assert.strictEqual(/\.bin$/.test(png), false);
+  assert.strictEqual(/\.bin$/.test(svg), false);
+  assert.strictEqual(/\.bin$/.test(woff2), false);
+});
+
+run('uses MIME-derived extensions for extensionless assets', function () {
+  const base = emulatorBaseFromUrl(
+    'https://support.cudy.com/emulator/C200P/'
+  );
+
+  assert.ok(/\.png$/.test(outputPathForUrl(
+    'https://support.cudy.com/emulator/C200P/assets/logo?id=1',
+    'image/png',
+    base
+  )));
+  assert.ok(/\.svg$/.test(outputPathForUrl(
+    'https://support.cudy.com/emulator/C200P/assets/diagram?id=1',
+    'image/svg+xml',
+    base
+  )));
+});
