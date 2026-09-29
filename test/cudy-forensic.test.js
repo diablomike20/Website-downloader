@@ -205,3 +205,26 @@ run('uses MIME-derived extensions for extensionless assets', function () {
     base
   )));
 });
+
+
+run('captures AC_Cloud mock API paths from SPA chunks', function () {
+  const page = 'https://support.cudy.com/emulator/AC_Cloud/assets/DeviceFirmware.js';
+  const base = emulatorBaseFromUrl(page);
+  const js = 'const a=S("v1/device/list"), b=S("v1/device/ac/upgrade/check");';
+
+  const refs = require('../cudy/forensic').extractReferences(
+    js,
+    'application/javascript',
+    page,
+    base
+  );
+
+  assert.strictEqual(
+    refs.urls.has('https://support.cudy.com/emulator/AC_Cloud/mock_api/web/v1/device/list.json'),
+    true
+  );
+  assert.strictEqual(
+    refs.urls.has('https://support.cudy.com/emulator/AC_Cloud/mock_api/web/v1/device/ac/upgrade/check.json'),
+    true
+  );
+});
