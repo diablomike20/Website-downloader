@@ -1,0 +1,188 @@
+name: FU_7 Build Master Dev Archive Final
+on:
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/fu_7-build-master-dev-archive-final.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Fetch comprehensive dev harvest
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-CUDY-DEV-HARVEST
+          path: master/fu_7-CUDY-DEV-HARVEST
+          repository: diablomike20/Website-downloader
+          run-id: 36637679378
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch WR3000 AdBlock beta
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-WR3000-ADBLOCK-BETA
+          path: master/fu_7-WR3000-ADBLOCK-BETA
+          repository: diablomike20/Website-downloader
+          run-id: 36637796292
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch dev CDN archive hunt
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-CUDY-DEV-CDN-ARCHIVE-HUNT
+          path: master/fu_7-CUDY-DEV-CDN-ARCHIVE-HUNT
+          repository: diablomike20/Website-downloader
+          run-id: 36638213464
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch P5 WiFi Calling beta recovery
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-P5-WIFICALLING-BETA
+          path: master/fu_7-P5-WIFICALLING-BETA
+          repository: diablomike20/Website-downloader
+          run-id: 36638253746
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch P2 deep collection
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-P2-DEEP-COLLECTION
+          path: master/fu_7-P2-DEEP-COLLECTION
+          repository: diablomike20/Website-downloader
+          run-id: 36640356953
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch recovered named betas metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-RECOVERED-CUDY-BETAS
+          path: master/fu_7-RECOVERED-CUDY-BETAS
+          repository: diablomike20/Website-downloader
+          run-id: 36637575818
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch beta FAQ recovery metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-CUDY-BETA-FAQ-RECOVERY
+          path: master/fu_7-CUDY-BETA-FAQ-RECOVERY
+          repository: diablomike20/Website-downloader
+          run-id: 36638719803
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch beta version marker hunt
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-CUDY-BETA-VERSION-HUNT
+          path: master/fu_7-CUDY-BETA-VERSION-HUNT
+          repository: diablomike20/Website-downloader
+          run-id: 36638785865
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch historical dev link recovery
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-CUDYFORUM-HISTORICAL-DEV
+          path: master/fu_7-CUDYFORUM-HISTORICAL-DEV
+          repository: diablomike20/Website-downloader
+          run-id: 36639579967
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch MediaFire recovery metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-P5-MEDIAFIRE-RECOVERY
+          path: master/fu_7-P5-MEDIAFIRE-RECOVERY
+          repository: diablomike20/Website-downloader
+          run-id: 36639624598
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch 4PDA attachment hunt
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-4PDA-CUDY-BETA-ATTACHMENTS
+          path: master/fu_7-4PDA-CUDY-BETA-ATTACHMENTS
+          repository: diablomike20/Website-downloader
+          run-id: 36639508405
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch 4PDA recovery hunt
+        uses: actions/download-artifact@v4
+        with:
+          name: fu_7-4PDA-CUDY-BETA-RECOVERY
+          path: master/fu_7-4PDA-CUDY-BETA-RECOVERY
+          repository: diablomike20/Website-downloader
+          run-id: 36639699415
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build deduplicated master
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          import os, hashlib, json, shutil
+          root="master"
+          out="dedup"
+          os.makedirs(out,exist_ok=True)
+          seen={}
+          manifest=[]
+          for dp,_,fns in os.walk(root):
+              for fn in sorted(fns):
+                  src=os.path.join(dp,fn)
+                  h=hashlib.sha256()
+                  with open(src,"rb") as f:
+                      for c in iter(lambda:f.read(1024*1024),b""):
+                          h.update(c)
+                  sha=h.hexdigest()
+                  rel=os.path.relpath(src,root)
+                  size=os.path.getsize(src)
+                  duplicate_of=seen.get(sha)
+                  if duplicate_of is None:
+                      dst=os.path.join(out,rel)
+                      os.makedirs(os.path.dirname(dst),exist_ok=True)
+                      shutil.copy2(src,dst)
+                      seen[sha]=rel
+                  manifest.append({
+                      "path":rel,
+                      "size":size,
+                      "sha256":sha,
+                      "duplicate_of":duplicate_of or ""
+                  })
+          with open("fu_7-CUDY-DEV-FIRMWARE-MASTER-MANIFEST.json","w",encoding="utf-8") as f:
+              json.dump(manifest,f,indent=2,ensure_ascii=False)
+          with open("fu_7-CUDY-DEV-FIRMWARE-MASTER-FILELIST.txt","w",encoding="utf-8") as f:
+              for x in manifest:
+                  suffix=(" DUPLICATE_OF="+x["duplicate_of"]) if x["duplicate_of"] else ""
+                  f.write(f'{x["path"]}\t{x["size"]}\t{x["sha256"]}{suffix}\n')
+          summary={
+              "input_files":len(manifest),
+              "unique_sha256":len(seen),
+              "input_bytes":sum(x["size"] for x in manifest),
+              "openwrt_intermediary_drive_included":False
+          }
+          with open("fu_7-CUDY-DEV-FIRMWARE-MASTER-SUMMARY.json","w") as f:
+              json.dump(summary,f,indent=2)
+          print(json.dumps(summary,indent=2))
+          PY
+          zip -r -0 fu_7-CUDY-DEV-FIRMWARE-MASTER.zip dedup             fu_7-CUDY-DEV-FIRMWARE-MASTER-MANIFEST.json             fu_7-CUDY-DEV-FIRMWARE-MASTER-FILELIST.txt             fu_7-CUDY-DEV-FIRMWARE-MASTER-SUMMARY.json
+
+      - name: Upload final master archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-CUDY-DEV-FIRMWARE-MASTER
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+          path: |
+            fu_7-CUDY-DEV-FIRMWARE-MASTER.zip
+            fu_7-CUDY-DEV-FIRMWARE-MASTER-MANIFEST.json
+            fu_7-CUDY-DEV-FIRMWARE-MASTER-FILELIST.txt
+            fu_7-CUDY-DEV-FIRMWARE-MASTER-SUMMARY.json
