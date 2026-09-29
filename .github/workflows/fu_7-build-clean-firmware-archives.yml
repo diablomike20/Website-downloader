@@ -283,13 +283,24 @@ jobs:
           sha256sum output/*.zip
           ls -lh output/*.zip
 
-      - name: Upload clean firmware archives
+      - name: Upload clean dev firmware master
         uses: actions/upload-artifact@v4
         with:
-          name: fu_7-CUDY-CLEAN-FIRMWARE-ARCHIVES
+          name: fu_7-CUDY-DEV-FIRMWARE-CLEAN-MASTER
           retention-days: 30
           compression-level: 0
           if-no-files-found: error
           path: |
-            output/fu_7-CUDY-DEV-FIRMWARE-CLEAN-MASTER.zip
-            output/fu_7-CUDY-OPENWRT-INTERMEDIARY-CLEAN.zip
+            output/build_master/firmware/
+            output/build_master/MANIFEST.csv
+
+      - name: Upload clean OpenWrt intermediary archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-CUDY-OPENWRT-INTERMEDIARY-CLEAN
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+          path: |
+            output/build_openwrt/firmware/
+            output/build_openwrt/MANIFEST.csv
