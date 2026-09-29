@@ -12,7 +12,6 @@ const DROP_QUERY_KEYS = new Set([
   'filter', 'filterOptions', 'pageNumber', 'pageSize', '_'
 ]);
 
-const SKIP_EXT = /\.(?:woff2?|ttf|eot|ico|mp4|webm|mp3|wav)$/i;
 const DANGEROUS_ROUTE = /(?:\/logout|\/reboot|\/reset|\/forget|\/revert|batchupgrade|batchadopt|\/gcom\/search)(?:[/?]|$)/i;
 const ATTR_RE = /<[^>]+\b(?:href|src|action)\s*=\s*["']([^"']+)["'][^>]*>/gi;
 const HTML_BASE_RE = /<base\s+[^>]*href\s*=\s*["']([^"']+)["'][^>]*>/i;
@@ -27,7 +26,21 @@ function sha256(buffer) {
 }
 
 function sleep(ms) {
+  if (!ms || ms <= 0) return Promise.resolve();
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function unlimitedNumber(value) {
+  if (value == null || value === '' || Number(value) <= 0) return Infinity;
+  return Number(value);
+}
+
+function isStaticSnapshotUrl(href, source) {
+  try {
+    const u = new URL(href);
+    if (/\.html$/i.test(u.pathname)) return true;
+  } catch (_) {}
+  return /^(?:static-map|luci-map):/.test(source || '');
 }
 
 function mapQueryPath(filePath) {
@@ -308,7 +321,7 @@ function requestBuffer(url, options, redirectCount) {
       }
 
       const declared = Number(res.headers['content-length'] || 0);
-      if (declared && declared > options.maxBytes) {
+      if (Number.isFinite(options.maxBytes) && declared && declared > options.maxBytes) {
         res.resume();
         reject(new Error('content-length exceeds maxBytes: ' + declared));
         return;
@@ -319,7 +332,7 @@ function requestBuffer(url, options, redirectCount) {
 
       res.on('data', (chunk) => {
         size += chunk.length;
-        if (size > options.maxBytes) {
+        if (Number.isFinite(options.maxBytes) && size > options.maxBytes) {
           req.destroy(new Error('response exceeds maxBytes'));
           return;
         }
@@ -336,9 +349,11 @@ function requestBuffer(url, options, redirectCount) {
       });
     });
 
-    req.setTimeout(options.timeoutMs, () => {
-      req.destroy(new Error('request timeout'));
-    });
+    if (Number.isFinite(options.timeoutMs) && options.timeoutMs > 0) {
+      req.setTimeout(options.timeoutMs, () => {
+        req.destroy(new Error('request timeout'));
+      });
+    }
 
     req.on('error', reject);
     req.end();
@@ -355,10 +370,10 @@ async function crawl(options) {
 
   const settings = {
     base,
-    maxBytes: Number(options.maxBytes || 64 * 1024 * 1024),
-    maxRequests: Number(options.maxRequests || 2500),
-    delayMs: Number(options.delayMs || 100),
-    timeoutMs: Number(options.timeoutMs || 20000),
+    maxBytes: unlimitedNumber(options.maxBytes),
+    maxRequests: unlimitedNumber(options.maxRequests),
+    delayMs: Number(options.delayMs || 0),
+    timeoutMs: unlimitedNumber(options.timeoutMs),
     userAgent: options.userAgent || 'fu_6-cudy-emulator-forensic-downloader/0.1'
   };
 
@@ -384,8 +399,7 @@ async function crawl(options) {
 
     if (!sameEmulatorScope(href, base)) return;
     if (visited.has(href) || queued.has(href)) return;
-    if (SKIP_EXT.test(new URL(href).pathname)) return;
-    if (DANGEROUS_ROUTE.test(href)) return;
+    if (DANGEROUS_ROUTE.test(href) && !isStaticSnapshotUrl(href, source)) return;
 
     queued.add(href);
     queue.push({ url: href, source: source || 'discovered' });
@@ -529,15 +543,20 @@ async function crawl(options) {
       discovered_luci_routes: allRoutes.size,
       unresolved: unresolved.size,
       settings: {
-        max_requests: settings.maxRequests,
-        max_bytes: settings.maxBytes,
+        max_requests: Number.isFinite(settings.maxRequests) ? settings.maxRequests : null,
+        max_bytes: Number.isFinite(settings.maxBytes) ? settings.maxBytes : null,
         delay_ms: settings.delayMs,
-        timeout_ms: settings.timeoutMs
+        timeout_ms: Number.isFinite(settings.timeoutMs) ? settings.timeoutMs : null
       },
       safety: {
         method: 'GET only',
         same_emulator_subtree_only: true,
-        destructive_routes_skipped: true,
+        live_destructive_routes_skipped_but_static_snapshots_kept: true,
+        no_asset_type_filtering: true,
+        no_default_request_cap: true,
+        no_default_response_size_cap: true,
+        no_default_delay: true,
+        no_default_timeout: true,
         no_auth_bypass: true,
         no_bruteforce: true,
         no_version_or_timestamp_spraying: true
