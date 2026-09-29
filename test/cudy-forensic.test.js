@@ -7,7 +7,9 @@ const {
   emulatorBaseFromUrl,
   sameEmulatorScope,
   luciStaticRelative,
-  bodyPairsToQuery
+  bodyPairsToQuery,
+  outputPathForUrl,
+  disambiguateOutputPath
 } = require('../cudy/forensic');
 
 function run(name, fn) {
@@ -126,4 +128,33 @@ run('discovers model-prefixed legacy LuCI route strings', function () {
     refs.routes.has('https://support.cudy.com/emulator/LT500/cgi-bin/luci/admin/system/backup'),
     true
   );
+});
+
+
+run('keeps extensionless and .html URL responses distinct', function () {
+  const base = emulatorBaseFromUrl(
+    'https://support.cudy.com/emulator/LT500/cgi-bin/luci/admin/system/backup'
+  );
+
+  const a = outputPathForUrl(
+    'https://support.cudy.com/emulator/LT500/cgi-bin/luci/admin/system/backup',
+    'text/html; charset=utf-8',
+    base
+  );
+  const b = outputPathForUrl(
+    'https://support.cudy.com/emulator/LT500/cgi-bin/luci/admin/system/backup.html',
+    'text/html; charset=utf-8',
+    base
+  );
+
+  assert.strictEqual(a, b);
+
+  const b2 = disambiguateOutputPath(
+    b,
+    'https://support.cudy.com/emulator/LT500/cgi-bin/luci/admin/system/backup.html',
+    0
+  );
+
+  assert.notStrictEqual(a, b2);
+  assert.ok(/__u_[0-9a-f]{12}\.html$/.test(b2));
 });
