@@ -15,13 +15,14 @@ jobs:
       - name: Install downloader
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install "gdown>=5.2.0"
+          python3 -m pip install "gdown>=6.4.1"
 
       - name: Download complete public Cudy intermediary folder
         run: |
           set -e
+          rm -rf fu_7-CUDY-INTERMEDIARY-OPENWRT-FIRMWARE
           mkdir -p fu_7-CUDY-INTERMEDIARY-OPENWRT-FIRMWARE
-          gdown --folder --remaining-ok             "https://drive.google.com/drive/folders/1BKVarlwlNxf7uJUtRhuMGUqeCa5KpMnj?usp=sharing"             -O fu_7-CUDY-INTERMEDIARY-OPENWRT-FIRMWARE
+          gdown --folder             "https://drive.google.com/drive/folders/1BKVarlwlNxf7uJUtRhuMGUqeCa5KpMnj?usp=sharing"             -O fu_7-CUDY-INTERMEDIARY-OPENWRT-FIRMWARE
 
       - name: Build manifest and hashes
         run: |
