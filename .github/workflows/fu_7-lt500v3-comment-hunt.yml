@@ -1,0 +1,28 @@
+name: FU_7 LT500V3 Comment Hunt
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - "scripts/fu_7_lt500v3_comment_hunt.py"
+      - ".github/workflows/fu_7-lt500v3-comment-hunt.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan CSP2.5 comments for LT500/LT500D 3.0
+        run: python3 scripts/fu_7_lt500v3_comment_hunt.py
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-LT500V3-COMMENT-HUNT
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            fu_7-LT500V3-COMMENT-HITS.csv
+            fu_7-LT500V3-COMMENT-HITS.json
