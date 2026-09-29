@@ -57,15 +57,7 @@ jobs:
 
           # Read exact SquashFS bytes_used from the v4 superblock (little endian, offset 40)
           # so the extracted filesystem image does not include fwtool/trailer bytes.
-          FS_SIZE=$(python3 - "$BIN" "$SQUASH_OFF" <<'PY'
-import struct, sys
-p=sys.argv[1]
-off=int(sys.argv[2])
-with open(p,'rb') as f:
-    f.seek(off + 40)
-    print(struct.unpack('<Q', f.read(8))[0])
-PY
-          )
+          FS_SIZE=$(python3 -c 'import struct,sys; p=sys.argv[1]; off=int(sys.argv[2]); f=open(p,"rb"); f.seek(off+40); print(struct.unpack("<Q",f.read(8))[0])' "$BIN" "$SQUASH_OFF")
           echo "SQUASHFS_BYTES_USED=$FS_SIZE" >> fu_6-layout.txt
 
           dd if="$BIN" of=fu_6-components/fu_6-rootfs.squashfs bs=1 skip="$SQUASH_OFF" count="$FS_SIZE" status=none
