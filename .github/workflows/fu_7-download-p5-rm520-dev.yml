@@ -18,7 +18,7 @@ jobs:
           set -e
           mkdir -p fu_7-P5-RM520-DEV
           python3 - <<'PY'
-          import re,html,urllib.request,os
+          import re,html,urllib.request,urllib.parse,os
           page="https://www.mediafire.com/file/8h45jt668wlxx06/Upgrade_RM520.zip/file"
           req=urllib.request.Request(page,headers={"User-Agent":"Mozilla/5.0 OpenCudy-FU7"})
           body=urllib.request.urlopen(req,timeout=40).read().decode("utf-8","replace")
