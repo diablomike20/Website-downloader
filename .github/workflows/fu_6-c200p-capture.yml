@@ -1,0 +1,44 @@
+name: fu_6 C200P full capture
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_6-c200p-capture.yml"
+      - "cudy/**"
+      - "bin/cudy-forensic.js"
+      - "package.json"
+
+jobs:
+  c200p-full:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Capture C200P emulator completely
+        run: |
+          node bin/cudy-forensic.js \
+            --url https://support.cudy.com/emulator/C200P/ \
+            --output fu_6-C200P-full
+      - name: Summarize capture
+        run: |
+          echo "Files:"
+          find fu_6-C200P-full -type f | wc -l
+          echo "Bytes:"
+          du -sb fu_6-C200P-full
+          echo "Routes:"
+          wc -l fu_6-C200P-full/fu_6-all-luci-routes.txt || true
+          echo "Unresolved:"
+          wc -l fu_6-C200P-full/fu_6-unresolved.txt || true
+          echo "Firmware/build findings:"
+          grep -RhoE '[0-9]+\.[0-9]+\.[0-9]+-20[0-9]{6}-[0-9]{6}' fu_6-C200P-full | sort -u || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fu_6-C200P-full
+          path: fu_6-C200P-full
+          compression-level: 6
