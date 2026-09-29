@@ -38,6 +38,10 @@ Unlike a normal `wget --mirror`, it also scans downloaded HTML/JS for LuCI route
 
 It preserves response bytes exactly and writes SHA-256 hashes and a route inventory.
 
+**fu_6 policy: a Cudy emulator capture is exhaustive by default.** There is no default request-count cap, response-size cap, asset-type filter, crawl delay, or artificial request timeout. Fonts, icons, media, JavaScript, CSS, JSON, HTML, binary download responses and static LuCI snapshots are all retained when they are referenced inside the selected emulator tree.
+
+The recursive boundary is the selected public `/emulator/<MODEL>/` subtree so a capture does not accidentally turn into a crawl of unrelated websites. Live destructive actions are never invoked, but their public static emulator snapshots are preserved when the emulator exposes them.
+
 ### Run
 
 ```bash
@@ -46,7 +50,7 @@ npm run cudy-forensic -- \
   --output cudy-forensic-output/C200P
 ```
 
-Useful limits:
+Optional operator limits are available only when you explicitly want them:
 
 ```bash
 npm run cudy-forensic -- \
@@ -56,6 +60,8 @@ npm run cudy-forensic -- \
   --delay-ms 100 \
   --timeout-ms 20000
 ```
+
+A value of `0` (the default) means unlimited/no artificial limit for request count, response size and timeout.
 
 The output contains:
 
@@ -69,7 +75,7 @@ fu_6-findings.json           firmware/build/model/URL leads
 fu_6-run.json                run settings and safety record
 ```
 
-The crawler is intentionally conservative: **GET only**, one selected emulator-model subtree only, known destructive/action routes are skipped, and it does not do authentication bypass, brute force, firmware version guessing or timestamp spraying.
+The crawler is intentionally read-only: **GET only** and one selected emulator-model subtree recursively. It does not invoke live destructive actions, authentication bypass, brute force, firmware-version guessing or timestamp spraying. Static emulator snapshots of action pages are still downloaded so the offline archive does not lose UI material.
 
 Run the route-mapping tests with:
 
