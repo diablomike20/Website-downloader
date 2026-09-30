@@ -1,0 +1,118 @@
+name: FU_7 C200P Internal Semantics Audit
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-c200p-internal-semantics.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FW_URL: "https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.14-20260618-150931-flash.zip"
+    steps:
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools lua5.1 binwalk file >/dev/null
+      - name: Extract and inspect exact semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p src fw rootfs out/raw
+          curl -L --fail --retry 3 "$FW_URL" -o src/fw.zip
+          unzip -q src/fw.zip -d fw
+          BIN="$(find fw -type f -name '*.bin' | head -1)"
+          python3 - "$BIN" <<'PY'
+          from pathlib import Path
+          import sys
+          p=Path(sys.argv[1]); d=p.read_bytes()
+          off=d.find(b"hsqs")
+          if off<0: raise SystemExit("no squashfs")
+          Path("src/rootfs.sqfs").write_bytes(d[off:])
+          print(off)
+          PY
+          unsquashfs -no-exit-code -d rootfs src/rootfs.sqfs >/dev/null
+
+          {
+            echo '===== ROM MARKERS ====='
+            find rootfs/etc -maxdepth 1 -type f -name 'rom*' -printf '%P %s bytes\n' | sort
+            echo
+            echo '===== EXACT DEVELOPER/FACTORY GATE REFERENCES ====='
+            grep -RIna --binary-files=text -E 'rom_develop|rom_research|rom_release|bdinfo[[:space:]].*(dbg|factory)|testonly\.js|luci\.main\.factory|factory.?mode|debug.?mode'               rootfs/etc rootfs/usr/lib/lua rootfs/www 2>/dev/null | head -3000 || true
+            echo
+            echo '===== FOOTER / THEME GATE ====='
+            grep -RIna --binary-files=text -E 'rom_develop|bdinfo|factory|testonly|develop|debug'               rootfs/usr/lib/lua/luci/view/themes rootfs/www 2>/dev/null | head -1000 || true
+            echo
+            echo '===== SSH CONTROLLER/MODEL STRINGS ====='
+            for f in rootfs/usr/lib/lua/luci/controller/ssh.lua rootfs/usr/lib/lua/luci/model/cbi/ssh/ssh.lua; do
+              [ -f "$f" ] || continue
+              echo "### $f"
+              strings -a -n 2 "$f"
+            done
+            echo
+            echo '===== SYSTEM HIDDEN TOOL STRINGS ====='
+            for f in               rootfs/usr/lib/lua/luci/controller/system.lua               rootfs/usr/lib/lua/luci/model/cbi/system/terminal.lua               rootfs/usr/lib/lua/luci/model/cbi/system/sandbox.lua               rootfs/usr/lib/lua/luci/model/cbi/system/preset.lua               rootfs/usr/lib/lua/luci/forbidden.lua; do
+              [ -f "$f" ] || continue
+              echo "### $f"
+              strings -a -n 2 "$f" | grep -Ei 'entry|admin|system|terminal|sandbox|telnet|preset|exec|cmd|command|forbid|hidden|develop|factory|debug|ssh|access|Run|Enable' || true
+            done
+            echo
+            echo '===== DESCRIPTION / GUI INTERNAL CAPABILITY STRINGS ====='
+            for f in rootfs/usr/lib/lua/luci/description.lua rootfs/usr/lib/lua/luci/gui.lua; do
+              echo "### $f"
+              strings -a -n 3 "$f" | grep -Ei 'ssh|terminal|sandbox|telnet|tcpdump|airdump|diag|batch|mesh|factory|debug|develop|cloud|serial|input-output|mirroring|tools|preset|forbidden|show|hidden|capabil' || true
+            done
+            echo
+            echo '===== CMAGENT BATCHCMD ====='
+            for f in rootfs/usr/lib/lua/cmagent/router/batchcmd.lua rootfs/usr/lib/lua/cmagent.lua; do
+              [ -f "$f" ] || continue
+              echo "### $f"
+              strings -a -n 2 "$f" | grep -Ei 'batchcmd|cmd|command|exec|fork|popen|shell|ssh|capability|topic|mqtt|request|response|result|system|ubus' | head -1600 || true
+            done
+            echo
+            echo '===== CMAGENT TCPDUMP ====='
+            for f in rootfs/usr/lib/lua/cmagent/router/tcpdump.lua rootfs/usr/sbin/mesh_tcpdump.sh rootfs/usr/lib/lua/luci/model/cbi/tools/tcpdump.lua rootfs/usr/lib/lua/luci/view/tools/mesh_tcpdump.htm; do
+              [ -f "$f" ] || continue
+              echo "### $f"
+              if grep -Iq . "$f"; then sed -n '1,1200p' "$f"; else strings -a -n 2 "$f" | head -1600; fi
+            done
+            echo
+            echo '===== CMAGENT DIAG ====='
+            for f in rootfs/usr/lib/lua/cmagent/router/diag.lua rootfs/usr/sbin/mesh_diag.sh; do
+              [ -f "$f" ] || continue
+              echo "### $f"
+              if grep -Iq . "$f"; then sed -n '1,1400p' "$f"; else strings -a -n 2 "$f" | head -1800; fi
+            done
+            echo
+            echo '===== SSH/TELNET INIT GATES ====='
+            for f in rootfs/etc/init.d/dropbear rootfs/etc/init.d/telnet; do
+              [ -f "$f" ] || continue
+              echo "### $f"
+              grep -n -E 'bdinfo|dbg|factory|start_service|start\(|PROG|enabled|disable|return' "$f" || true
+            done
+          } > out/fu_7-C200P-INTERNAL-SEMANTICS.txt
+
+          # Disassemble the small Lua bytecode files for gate/control logic.
+          for f in             rootfs/usr/lib/lua/luci/controller/ssh.lua             rootfs/usr/lib/lua/luci/model/cbi/ssh/ssh.lua             rootfs/usr/lib/lua/cmagent/router/batchcmd.lua             rootfs/usr/lib/lua/cmagent/router/tcpdump.lua             rootfs/usr/lib/lua/cmagent/router/diag.lua             rootfs/usr/lib/lua/luci/description.lua             rootfs/usr/lib/lua/luci/gui.lua             rootfs/usr/lib/lua/luci/forbidden.lua; do
+            [ -f "$f" ] || continue
+            safe="$(echo "$f" | sed 's#rootfs/##;s#/#_#g')"
+            luac5.1 -l -l "$f" > "out/raw/$safe.luac.txt" 2>&1 || true
+            strings -a -n 2 "$f" > "out/raw/$safe.strings.txt" || true
+          done
+
+          cat out/fu_7-C200P-INTERNAL-SEMANTICS.txt
+          zip -qr fu_7-C200P-INTERNAL-SEMANTICS.zip out
+          sha256sum fu_7-C200P-INTERNAL-SEMANTICS.zip
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-C200P-INTERNAL-SEMANTICS
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            fu_7-C200P-INTERNAL-SEMANTICS.zip
+            out/fu_7-C200P-INTERNAL-SEMANTICS.txt
