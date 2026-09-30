@@ -1,0 +1,40 @@
+name: FU_7 P2 R91 Dev Option Audit
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-p2-r91-dev-audit.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fu_7-cudy-cdn-index
+      - name: Install analysis tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools p7zip-full binwalk file >/dev/null
+      - name: Static P2 R91 audit
+        run: |
+          python3 scripts/fu_7_p2_r91_dev_audit.py
+          zip -qr fu_7-P2-R91-DEV-AUDIT.zip report
+          sha256sum fu_7-P2-R91-DEV-AUDIT.zip
+      - name: Upload audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-P2-R91-DEV-AUDIT
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            fu_7-P2-R91-DEV-AUDIT.zip
+            report/fu_7-P2-R91-DEV-AUDIT.txt
+            report/router-rootfs-diff.json
+            report/payload-identification.json
