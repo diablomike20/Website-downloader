@@ -1,0 +1,198 @@
+name: FU_7 C200P Deep Internal Dev Audit
+
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-c200p-deep-internal-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EMULATOR_ARTIFACT_ID: "11018311218"
+      FW_URL: "https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.14-20260618-150931-flash.zip"
+    steps:
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools p7zip-full binwalk file lua5.1 jq >/dev/null
+
+      - name: Download exact firmware and emulator corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p src fw rootfs em report
+
+          curl -L --fail --retry 3 --retry-delay 2 "$FW_URL" -o src/C200P-flash.zip
+          sha256sum src/C200P-flash.zip | tee report/FW-OUTER-SHA256.txt
+          unzip -l src/C200P-flash.zip | tee report/FW-OUTER-LIST.txt
+          unzip -q src/C200P-flash.zip -d fw
+          BIN="$(find fw -type f -name '*.bin' | head -1)"
+          echo "$BIN" > report/FW-BIN-PATH.txt
+          sha256sum "$BIN" | tee report/FW-INNER-SHA256.txt
+          file "$BIN" | tee report/FW-INNER-FILE.txt
+          binwalk "$BIN" | tee report/FW-BINWALK.txt || true
+
+          curl -L --fail --retry 2             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             -H "X-GitHub-Api-Version: 2022-11-28"             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$EMULATOR_ARTIFACT_ID/zip"             -o src/emulator-artifact.zip
+          unzip -q src/emulator-artifact.zip -d em
+          find em -type f | grep -i 'C200P' | head -5000 > report/EM-C200P-FILES.txt || true
+
+      - name: Extract SquashFS
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN="$(cat report/FW-BIN-PATH.txt)"
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path(open("report/FW-BIN-PATH.txt").read().strip())
+          data=p.read_bytes()
+          offs=[]
+          start=0
+          while True:
+              i=data.find(b"hsqs",start)
+              if i<0: break
+              offs.append(i); start=i+1
+          print("SQUASHFS_OFFSETS",offs)
+          Path("report/SQUASHFS-OFFSETS.txt").write_text("\n".join(map(str,offs))+"\n")
+          if not offs: raise SystemExit("no squashfs")
+          off=offs[0]
+          Path("src/rootfs.squashfs").write_bytes(data[off:])
+          PY
+          unsquashfs -no-exit-code -d rootfs src/rootfs.squashfs | tee report/UNSQUASHFS.txt
+
+      - name: Deep static audit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          find rootfs -type f | sort > report/ROOTFS-FILES.txt
+          find rootfs/etc -maxdepth 1 -type f -name 'rom*' -printf '%f %s bytes\n' | sort > report/ROM-MARKERS.txt || true
+
+          {
+            echo "===== ROM / FACTORY / DEBUG MARKERS ====="
+            cat report/ROM-MARKERS.txt
+            echo
+            echo "===== BDINFO / DEVELOP / FACTORY / DEBUG REFERENCES ====="
+            grep -RIna --binary-files=text -E               'rom_develop|rom_research|rom_release|bdinfo[[:space:]].*(dbg|factory)|bdinfo.*(dbg|factory)|testonly|factory.?mode|debug.?mode|develop(er|ment)?|research'               rootfs/etc rootfs/usr rootfs/www 2>/dev/null | head -6000 || true
+            echo
+            echo "===== SHELL / TERMINAL / TELNET / SSH ====="
+            grep -RIna --binary-files=text -E               'system/terminal|terminal\.lua|sandbox\.lua|telnetd|/etc/init.d/telnet|dropbear|sshd|sshinfo|luci\.util\.exec|sys\.exec|util\.exec|fork_exec'               rootfs/usr/lib/lua rootfs/etc rootfs/www 2>/dev/null | head -6000 || true
+            echo
+            echo "===== ENGINEERING CAPABILITY NAMES ====="
+            grep -RIna --binary-files=text -E               'batchcmd|mesh_tcpdump|mesh_diag|tcpdump|packet.?capture|pcap|airdump|serial-service|input-output|gpio|mirroring|AT Command|atcmd|diag(nostic)?|factory|preset'               rootfs/usr/lib/lua rootfs/etc rootfs/usr/bin rootfs/usr/sbin rootfs/www 2>/dev/null | head -8000 || true
+            echo
+            echo "===== CLOUD / INTERNAL MANAGEMENT ====="
+            grep -RIna --binary-files=text -E               'cmagent|cmsd|cloud.?manage|cloud.?status|ac_cloud|mosquitto|mqtt|batchcmd|sshinfo'               rootfs/etc rootfs/usr rootfs/www 2>/dev/null | head -6000 || true
+          } > report/C200P-DEEP-HITS.txt
+
+          # Route inventory from controllers/models/views
+          {
+            echo "===== CONTROLLERS ====="
+            find rootfs/usr/lib/lua/luci/controller -type f -printf '%P\n' | sort || true
+            echo
+            echo "===== ENGINEERING/INTERNAL CBI MODELS ====="
+            find rootfs/usr/lib/lua/luci/model/cbi -type f -printf '%P\n' |               grep -Ei 'terminal|sandbox|preset|firstboot|diag|airdump|tcpdump|capture|atcmd|magic|reset|upgrade|serial|input|output|gpio|mirror|ssh|cloud|batch|mesh|debug|factory' | sort || true
+            echo
+            echo "===== ROUTE STRINGS ====="
+            find rootfs/usr/lib/lua/luci/controller -type f -print0 | while IFS= read -r -d '' f; do
+              s="$(strings -a -n 3 "$f" | grep -Ei 'admin/|terminal|sandbox|preset|firstboot|diag|airdump|tcpdump|capture|atcmd|magic|serial|input-output|mirroring|ssh|cloud|batchcmd|mesh_diag|mesh_tcpdump|debug|factory' | head -300 || true)"
+              [ -n "$s" ] && { echo "### $f"; echo "$s"; }
+            done
+          } > report/C200P-ROUTES.txt
+
+          # Dedicated interesting files, raw strings and disassembly where possible
+          mkdir -p report/files
+          find rootfs/usr/lib/lua/luci -type f | grep -E             '/(description|gui|forbidden)\.lua$|/controller/(system|diag|network|cloud|ac|mesh).*\.lua$|/model/cbi/.*/(terminal|sandbox|preset|firstboot|atcmd|magic|upgrade|reset|.*tcpdump.*|.*diag.*|.*ssh.*)\.lua$'             > report/INTERESTING-LUA.txt || true
+
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            safe="$(echo "$f" | sed 's#^rootfs/##; s#[/ ]#_#g')"
+            strings -a -n 2 "$f" > "report/files/$safe.strings.txt" || true
+            luac5.1 -l -l "$f" > "report/files/$safe.luac.txt" 2>&1 || true
+          done < report/INTERESTING-LUA.txt
+
+          # Important init/service files
+          {
+            for f in               rootfs/etc/init.d/telnet               rootfs/etc/init.d/dropbear               rootfs/etc/init.d/cmagent               rootfs/etc/init.d/cmsd               rootfs/etc/init.d/mosquitto; do
+              [ -f "$f" ] || continue
+              echo "===== $f ====="
+              sed -n '1,600p' "$f"
+            done
+          } > report/C200P-INIT-SERVICES.txt
+
+          # Search emulator corpus for exact capability/backend snapshot.
+          {
+            echo "===== EMULATOR exact build identity/capability strings ====="
+            grep -RIna --binary-files=text -E               '2\.5\.14-20260618-150931|C200P|sshinfo|batchcmd|mesh_tcpdump|mesh_diag|ssh'               em 2>/dev/null | grep -i 'C200P\|2.5.14-20260618\|sshinfo\|batchcmd\|mesh_' | head -8000 || true
+          } > report/C200P-EMULATOR-EVIDENCE.txt
+
+          # Cross-reference emulator capability names to actual firmware path/string hits.
+          python3 - <<'PY'
+          import os, re, json
+          from pathlib import Path
+          caps=["ssh","batchcmd","mesh_tcpdump","mesh_diag","tcpdump","airdump","terminal","sandbox","telnet","diag","preset","atcmd"]
+          rows=[]
+          for cap in caps:
+              hits=[]
+              for p in Path("rootfs").rglob("*"):
+                  if not p.is_file(): continue
+                  try:
+                      if p.stat().st_size>5_000_000: continue
+                      data=p.read_bytes()
+                  except: continue
+                  if cap.encode().lower() in data.lower():
+                      hits.append(str(p.relative_to("rootfs")))
+              rows.append({"capability":cap,"firmware_hits":hits[:200],"count":len(hits)})
+          Path("report/C200P-CAPABILITY-CROSSREF.json").write_text(json.dumps(rows,indent=2))
+          with open("report/C200P-CAPABILITY-CROSSREF.tsv","w") as f:
+              f.write("capability\tcount\tpaths\n")
+              for r in rows:
+                  f.write(r["capability"]+"\t"+str(r["count"])+"\t"+" | ".join(r["firmware_hits"])+"\n")
+          PY
+
+          # Compact summary for easy inspection
+          {
+            echo "===== EXACT BUILD ====="
+            cat report/FW-INNER-SHA256.txt
+            cat report/ROM-MARKERS.txt
+            echo
+            echo "===== CAPABILITY CROSSREF ====="
+            cat report/C200P-CAPABILITY-CROSSREF.tsv
+            echo
+            echo "===== ROUTES ====="
+            sed -n '1,2500p' report/C200P-ROUTES.txt
+            echo
+            echo "===== DEEP HITS ====="
+            sed -n '1,5000p' report/C200P-DEEP-HITS.txt
+            echo
+            echo "===== INIT SERVICES ====="
+            cat report/C200P-INIT-SERVICES.txt
+            echo
+            echo "===== EMULATOR EVIDENCE ====="
+            sed -n '1,3000p' report/C200P-EMULATOR-EVIDENCE.txt
+          } > report/fu_7-C200P-DEEP-INTERNAL-AUDIT.txt
+
+          zip -qr fu_7-C200P-DEEP-INTERNAL-AUDIT.zip report
+          sha256sum fu_7-C200P-DEEP-INTERNAL-AUDIT.zip
+          ls -lh fu_7-C200P-DEEP-INTERNAL-AUDIT.zip
+
+      - name: Upload audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-C200P-DEEP-INTERNAL-AUDIT
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            fu_7-C200P-DEEP-INTERNAL-AUDIT.zip
+            report/fu_7-C200P-DEEP-INTERNAL-AUDIT.txt
+            report/C200P-CAPABILITY-CROSSREF.json
+            report/C200P-ROUTES.txt
+            report/C200P-DEEP-HITS.txt
