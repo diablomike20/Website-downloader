@@ -1,0 +1,195 @@
+name: fu_8 C200P 2.5.14 vs 2.5.15 deep diff
+
+on:
+  push:
+    branches:
+      - fu_8-static-forensics
+    paths:
+      - ".github/workflows/fu_8-c200p-2514-vs-2515-deep-diff.yml"
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install extraction tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y squashfs-tools file xz-utils unzip
+
+      - name: Download, verify, extract and compare C200P firmwares
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          OUT="fu_8-C200P-2514-VS-2515-DEEP-DIFF-01"
+          mkdir -p "$OUT"/{input,rootfs,report,selected}
+
+          OLD_URL="https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.14-20260618-150931-flash.zip"
+          NEW_URL="https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.15-20260629-160214-flash.zip"
+
+          curl -L --fail --retry 4 --retry-delay 2 -o "$OUT/input/old.zip" "$OLD_URL"
+          curl -L --fail --retry 4 --retry-delay 2 -o "$OUT/input/new.zip" "$NEW_URL"
+
+          echo "a4f5f6494bcbdf41bfcd8573a22531fbd2115b5cb2769f5f44da213a900a7e98  $OUT/input/old.zip" | sha256sum -c -
+
+          extract_one() {
+            tag="$1"
+            zip="$2"
+            d="$OUT/input/$tag"
+            mkdir -p "$d"
+            unzip -o "$zip" -d "$d" >/dev/null
+
+            bin="$(find "$d" -maxdepth 1 -type f -name '*.bin' | head -n1)"
+            [ -n "$bin" ] || { echo "BIN missing for $tag" >&2; exit 1; }
+
+            sqoff="$(grep -aob -m1 'hsqs' "$bin" | cut -d: -f1)"
+            [ -n "$sqoff" ] || { echo "SquashFS missing for $tag" >&2; exit 1; }
+
+            fssize="$(python3 - "$bin" "$sqoff" <<'PY'
+import struct,sys
+p=sys.argv[1]; off=int(sys.argv[2])
+with open(p,'rb') as f:
+    f.seek(off+40)
+    print(struct.unpack('<Q',f.read(8))[0])
+PY
+)"
+            dd if="$bin" of="$OUT/input/$tag.squashfs" bs=1 skip="$sqoff" count="$fssize" status=none
+            sudo rm -rf "$OUT/rootfs/$tag"
+            sudo unsquashfs -f -d "$OUT/rootfs/$tag" "$OUT/input/$tag.squashfs" >/dev/null
+            sudo chown -R "$(id -u):$(id -g)" "$OUT/rootfs/$tag"
+
+            {
+              echo "tag=$tag"
+              echo "source_url=$( [ "$tag" = old ] && echo "$OLD_URL" || echo "$NEW_URL" )"
+              echo "zip_bytes=$(stat -c %s "$zip")"
+              echo "zip_sha256=$(sha256sum "$zip" | awk '{print $1}')"
+              echo "bin_name=$(basename "$bin")"
+              echo "bin_bytes=$(stat -c %s "$bin")"
+              echo "bin_sha256=$(sha256sum "$bin" | awk '{print $1}')"
+              printf 'squashfs_offset_dec=%s\nsquashfs_offset_hex=0x%X\n' "$sqoff" "$sqoff"
+              echo "squashfs_bytes_used=$fssize"
+              echo "squashfs_sha256=$(sha256sum "$OUT/input/$tag.squashfs" | awk '{print $1}')"
+              echo "rootfs_files=$(find "$OUT/rootfs/$tag" -type f | wc -l)"
+              echo "rootfs_symlinks=$(find "$OUT/rootfs/$tag" -type l | wc -l)"
+              echo "rootfs_dirs=$(find "$OUT/rootfs/$tag" -type d | wc -l)"
+            } > "$OUT/report/$tag-identity.txt"
+
+            unsquashfs -s "$OUT/input/$tag.squashfs" > "$OUT/report/$tag-squashfs-superblock.txt"
+            file "$zip" "$bin" "$OUT/input/$tag.squashfs" > "$OUT/report/$tag-file-types.txt"
+          }
+
+          extract_one old "$OUT/input/old.zip"
+          extract_one new "$OUT/input/new.zip"
+
+          python3 - "$OUT" <<'PY'
+import os,sys,hashlib,csv,stat
+from pathlib import Path
+out=Path(sys.argv[1])
+
+def manifest(root):
+    root=Path(root)
+    m={}
+    for p in sorted(root.rglob('*')):
+        rel='/' + str(p.relative_to(root))
+        st=p.lstat()
+        mode=oct(stat.S_IMODE(st.st_mode))
+        if p.is_symlink():
+            m[rel]=('L',mode,os.readlink(p),'')
+        elif p.is_file():
+            h=hashlib.sha256()
+            with p.open('rb') as f:
+                for b in iter(lambda:f.read(1024*1024),b''): h.update(b)
+            m[rel]=('F',mode,str(st.st_size),h.hexdigest())
+        elif p.is_dir():
+            m[rel]=('D',mode,'','')
+    return m
+
+old=manifest(out/'rootfs/old')
+new=manifest(out/'rootfs/new')
+with (out/'report/old-manifest.csv').open('w',newline='') as f:
+    w=csv.writer(f);w.writerow(['path','type','mode','size_or_target','sha256'])
+    for k,v in old.items():w.writerow([k,*v])
+with (out/'report/new-manifest.csv').open('w',newline='') as f:
+    w=csv.writer(f);w.writerow(['path','type','mode','size_or_target','sha256'])
+    for k,v in new.items():w.writerow([k,*v])
+
+only_old=sorted(set(old)-set(new))
+only_new=sorted(set(new)-set(old))
+common=sorted(set(old)&set(new))
+changed=[k for k in common if old[k]!=new[k]]
+same=[k for k in common if old[k]==new[k]]
+
+with (out/'report/tree-diff.csv').open('w',newline='') as f:
+    w=csv.writer(f)
+    w.writerow(['status','path','old_type','old_mode','old_size_or_target','old_sha256','new_type','new_mode','new_size_or_target','new_sha256'])
+    for k in only_old:w.writerow(['ONLY_2.5.14',k,*old[k],'','','',''])
+    for k in only_new:w.writerow(['ONLY_2.5.15',k,'','','','',*new[k]])
+    for k in changed:w.writerow(['CHANGED',k,*old[k],*new[k]])
+
+with (out/'report/summary.txt').open('w') as f:
+    f.write(f'old_entries={len(old)}\nnew_entries={len(new)}\n')
+    f.write(f'only_old={len(only_old)}\nonly_new={len(only_new)}\n')
+    f.write(f'changed_common={len(changed)}\nidentical_common={len(same)}\n')
+
+targets=[
+ '/usr/lib/lua/luci/controller/',
+ '/usr/lib/lua/luci/model/',
+ '/usr/lib/lua/luci/view/',
+ '/usr/lib/lua/luci/apprpc/',
+ '/etc/init.d/',
+ '/etc/hotplug.d/',
+ '/usr/lib/4g/',
+ '/usr/bin/',
+ '/usr/sbin/',
+ '/etc/uci-defaults/',
+]
+with (out/'report/targeted-diff.txt').open('w') as f:
+    for k in only_old:
+        if any(k.startswith(x) for x in targets): f.write('ONLY_2.5.14 '+k+'\n')
+    for k in only_new:
+        if any(k.startswith(x) for x in targets): f.write('ONLY_2.5.15 '+k+'\n')
+    for k in changed:
+        if any(k.startswith(x) for x in targets): f.write('CHANGED '+k+'\n')
+PY
+
+          for tag in old new; do
+            root="$OUT/rootfs/$tag"
+            {
+              echo "===== $tag identity/version ====="
+              grep -RIna -m50 -E '2\.5\.(14|15)|C200P|R74' "$root/etc" "$root/usr" 2>/dev/null || true
+              echo
+              echo "===== $tag markers/capabilities ====="
+              grep -RIna -m500 -E 'rom_develop|rom_research|testonly|batchcmd|mesh_tcpdump|mesh_diag|dropbear|telnet|sshinfo|cloud.?manage|cloud_management|cmagent|cmsd|debug_mode|DEBUG MODE|factorytest|factory|forbidden'                 "$root/etc" "$root/usr" "$root/www" 2>/dev/null || true
+            } > "$OUT/report/$tag-marker-grep.txt"
+
+            for p in               usr/lib/lua/luci/controller               usr/lib/lua/luci/model               usr/lib/lua/luci/view               usr/lib/lua/luci/apprpc               etc/init.d etc/hotplug.d usr/lib/4g; do
+              if [ -e "$root/$p" ]; then
+                mkdir -p "$OUT/selected/$tag/$(dirname "$p")"
+                cp -a "$root/$p" "$OUT/selected/$tag/$p"
+              fi
+            done
+          done
+
+          {
+            echo "===== identity old ====="; cat "$OUT/report/old-identity.txt"
+            echo "===== identity new ====="; cat "$OUT/report/new-identity.txt"
+            echo "===== summary ====="; cat "$OUT/report/summary.txt"
+            echo "===== targeted diff ====="; cat "$OUT/report/targeted-diff.txt"
+          } > "$OUT/fu_8-C200P-2514-VS-2515-DEEP-DIFF-01.txt"
+
+          # Do not upload full rootfs trees; preserve faithful rootfs tarballs + selected source trees.
+          sudo tar --numeric-owner -czf "$OUT/fu_8-C200P-2.5.14-rootfs.tar.gz" -C "$OUT/rootfs" old
+          sudo tar --numeric-owner -czf "$OUT/fu_8-C200P-2.5.15-rootfs.tar.gz" -C "$OUT/rootfs" new
+          sudo chown "$(id -u):$(id -g)" "$OUT"/*.tar.gz
+          rm -rf "$OUT/rootfs" "$OUT/input/old" "$OUT/input/new"
+          rm -f "$OUT/input/old.zip" "$OUT/input/new.zip"
+
+          (cd "$OUT" && find . -type f -print0 | sort -z | xargs -0 sha256sum > fu_8-SHA256SUMS.txt)
+
+      - name: Upload FU8 C200P deep diff
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_8-C200P-2514-VS-2515-DEEP-DIFF-01
+          path: fu_8-C200P-2514-VS-2515-DEEP-DIFF-01
+          compression-level: 0
+          include-hidden-files: true
