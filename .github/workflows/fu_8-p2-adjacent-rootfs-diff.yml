@@ -27,7 +27,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
+          set -euxo pipefail
           OUT="fu_8-P2-2.4.29-vs-2.4.29b-ADJACENT-DIFF"
           mkdir -p "$OUT/work" "$OUT/results"
           cd "$OUT/work"
@@ -50,15 +50,18 @@ jobs:
           S_BETA=$(grep -aob -m1 'hsqs' "$BETA" | cut -d: -f1)
           printf 'stable_squash_dec=%s\nstable_squash_hex=0x%X\nbeta_squash_dec=%s\nbeta_squash_hex=0x%X\n' "$S_STABLE" "$S_STABLE" "$S_BETA" "$S_BETA" > ../results/fu_8-image-layout.txt
 
-          dd if="$STABLE" of=stable.squashfs bs=1 skip="$S_STABLE" status=none
-          dd if="$BETA" of=beta.squashfs bs=1 skip="$S_BETA" status=none
+          echo "MILESTONE=image_verified" > ../results/fu_8-progress.log
+          tail -c "+$((S_STABLE+1))" "$STABLE" > stable.squashfs
+          tail -c "+$((S_BETA+1))" "$BETA" > beta.squashfs
+          echo "MILESTONE=squashfs_sliced" >> ../results/fu_8-progress.log
           unsquashfs -s stable.squashfs > ../results/fu_8-stable-squashfs-superblock.txt 2>&1
           unsquashfs -s beta.squashfs > ../results/fu_8-beta-squashfs-superblock.txt 2>&1
 
           mkdir stable-root beta-root
           sudo unsquashfs -f -d "$PWD/stable-root" stable.squashfs > ../results/fu_8-stable-unsquashfs.log 2>&1
+          echo "MILESTONE=stable_unsquashed" >> ../results/fu_8-progress.log
           sudo unsquashfs -f -d "$PWD/beta-root" beta.squashfs > ../results/fu_8-beta-unsquashfs.log 2>&1
-          sudo chown -R "$(id -u):$(id -g)" stable-root beta-root ../results
+          echo "MILESTONE=beta_unsquashed" >> ../results/fu_8-progress.log
 
           python3 - <<'PY'
           import os,stat,hashlib,csv,json
@@ -116,6 +119,7 @@ jobs:
                   if s!='UNCHANGED' and p.startswith(focus_prefix):
                       f.write(f'{s}\t{p}\n')
           PY
+          echo "MILESTONE=python_diff_done" >> ../results/fu_8-progress.log
 
           for p in             etc/hotplug.d/gcom/30-4g             etc/hotplug.d/tty/30-4g             etc/rom_research             usr/lib/4g/check.sh             usr/lib/4g/reup.sh; do
             {
@@ -149,6 +153,7 @@ jobs:
           echo "P2_ADJACENT_ROOTFS_DIFF=PASS" > ../results/fu_8-result.txt
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: fu_8-P2-2.4.29-vs-2.4.29b-ADJACENT-DIFF
           path: fu_8-P2-2.4.29-vs-2.4.29b-ADJACENT-DIFF/results
