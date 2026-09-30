@@ -1,0 +1,41 @@
+name: FU_7 C200P Deep Audit Evidence Summary
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-c200p-audit-evidence-summary.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  summarize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_ARTIFACT_ID: "11073044009"
+    steps:
+      - name: Print focused C200P evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p src
+          curl -L --fail --retry 2             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             -H "X-GitHub-Api-Version: 2022-11-28"             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$SOURCE_ARTIFACT_ID/zip"             -o src/outer.zip
+          unzip -q src/outer.zip -d src/out
+          nested="$(find src/out -type f -name 'fu_7-C200P-DEEP-INTERNAL-AUDIT.zip' | head -1)"
+          mkdir -p src/report
+          unzip -q "$nested" -d src/report
+
+          echo '@@@ CAPABILITY_CROSSREF'
+          cat src/report/report/C200P-CAPABILITY-CROSSREF.tsv
+          echo '@@@ ROM_DEBUG_FACTORY'
+          grep -Ein 'rom_develop|rom_research|rom_release|bdinfo|factory|debug|testonly|develop|research'             src/report/report/C200P-DEEP-HITS.txt | head -1800 || true
+          echo '@@@ ROUTES_INTERNAL'
+          grep -Ein 'terminal|sandbox|telnet|ssh|batchcmd|mesh_tcpdump|mesh_diag|tcpdump|airdump|diag|preset|atcmd|factory|debug|cloud|serial|input-output|mirroring'             src/report/report/C200P-ROUTES.txt | head -2200 || true
+          echo '@@@ INIT_SERVICES'
+          cat src/report/report/C200P-INIT-SERVICES.txt
+          echo '@@@ EMULATOR_CAPS'
+          grep -Ein '2.5.14-20260618-150931|sshinfo|batchcmd|mesh_tcpdump|mesh_diag|ssh|C200P'             src/report/report/C200P-EMULATOR-EVIDENCE.txt | head -2000 || true
+          echo '@@@ INTERESTING_LUA'
+          cat src/report/report/INTERESTING-LUA.txt
