@@ -59,8 +59,8 @@ jobs:
           sha256sum "$STABLE" "$BETA" > ../results/fu_8-payload-sha256.txt
           stat -c '%n %s' "$STABLE" "$BETA" > ../results/fu_8-payload-sizes.txt
 
-          U_STABLE=$(grep -aob -m1 'UBI#' "$STABLE" | cut -d: -f1)
-          U_BETA=$(grep -aob -m1 'UBI#' "$BETA" | cut -d: -f1)
+          U_STABLE=$(grep -aob 'UBI#' "$STABLE" | cut -d: -f1 | head -1)
+          U_BETA=$(grep -aob 'UBI#' "$BETA" | cut -d: -f1 | head -1)
           printf 'stable_ubi_dec=%s\nstable_ubi_hex=0x%X\nbeta_ubi_dec=%s\nbeta_ubi_hex=0x%X\n' "$U_STABLE" "$U_STABLE" "$U_BETA" "$U_BETA" > ../results/fu_8-ubi-layout.txt
           tail -c "+$((U_STABLE+1))" "$STABLE" > stable.ubi
           tail -c "+$((U_BETA+1))" "$BETA" > beta.ubi
