@@ -24,14 +24,13 @@ def sha256_file(p):
 
 def download_artifact():
     url=f"https://api.github.com/repos/{REPO}/actions/artifacts/{ARTIFACT_ID}/zip"
-    req=urllib.request.Request(url, headers={
-        "Authorization":f"Bearer {TOKEN}",
-        "Accept":"application/vnd.github+json",
-        "X-GitHub-Api-Version":"2022-11-28",
-        "User-Agent":"OpenCudy-FU7-P2-Audit"
-    })
-    with urllib.request.urlopen(req, timeout=180) as r:
-        (SRC/"artifact.zip").write_bytes(r.read())
+    subprocess.run([
+        "curl","-L","--fail","--retry","2",
+        "-H",f"Authorization: Bearer {TOKEN}",
+        "-H","Accept: application/vnd.github+json",
+        "-H","X-GitHub-Api-Version: 2022-11-28",
+        url,"-o",str(SRC/"artifact.zip")
+    ],check=True)
     with zipfile.ZipFile(SRC/"artifact.zip") as z:
         z.extractall(SRC/"artifact")
 
