@@ -1,0 +1,94 @@
+name: FU_7 P2 Hidden Controls Audit
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-p2-hidden-controls-audit.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_ARTIFACT_ID: "11071941089"
+    steps:
+      - name: Extract hidden-control evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p src beta out
+          curl -L --fail --retry 2             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             -H "X-GitHub-Api-Version: 2022-11-28"             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$SOURCE_ARTIFACT_ID/zip"             -o src/outer.zip
+          unzip -q src/outer.zip -d src/outer
+          nested="$(find src/outer -maxdepth 2 -type f -name 'fu_7-P2-R91-DEV-AUDIT.zip' | head -1)"
+
+          # Pull modem/router raw reports.
+          for n in             'P2_RG500_A09.bin.binwalk.txt'             'P2_RG500_A09.bin.keyword-strings.txt'             'R91-2.4.23b-20251208-CellularUpgrade.bin.binwalk.txt'             'R91-2.4.23b-20251208-CellularUpgrade.bin.keyword-strings.txt'
+          do
+            unzip -p "$nested" "report/$n" > "out/$n" || true
+          done
+
+          # Extract beta rootfs files selectively.
+          unzip -Z1 "$nested" | grep 'report/rootfs/P2-R91-2.4.29b-20260422-101502-sysupgrade.bin__ubi__.*_vol-rootfs.ubifs/' > src/beta-files.txt
+          grep -E '/usr/lib/lua/luci/(controller|apprpc|model/cbi|view)/|/etc/(config|init.d)/|/usr/lib/4g/|/www/' src/beta-files.txt > src/selected.txt || true
+          while IFS= read -r member; do
+            unzip -q "$nested" "$member" -d beta || true
+          done < src/selected.txt
+          root="$(find beta/report/rootfs -maxdepth 1 -type d -name 'P2-R91-2.4.29b-*' | head -1)"
+
+          {
+            echo '===== CONTROL/ROUTE FILE NAMES ====='
+            find "$root/usr/lib/lua/luci" -type f | sed "s#^$root/##" | grep -Ei 'gcom|cellular|diag|tool|system|upgrade|firmware|factory|debug|developer|at|air|capture|terminal|shell' | sort
+            echo
+            echo '===== ROUTE DEFINITIONS ====='
+            grep -RIna --binary-files=text -E 'entry\(|alias\(|call\(|cbi\(|template\(' "$root/usr/lib/lua/luci/controller" 2>/dev/null | grep -Ei 'gcom|cellular|diag|tool|system|upgrade|firmware|factory|debug|developer|at|air|capture|terminal|shell' | head -2000 || true
+            echo
+            echo '===== GCOM CONTROLLER ====='
+            sed -n '1,1200p' "$root/usr/lib/lua/luci/controller/gcom.lua" 2>/dev/null || true
+            echo
+            echo '===== CELLULAR APPRPC ====='
+            sed -n '1,1800p' "$root/usr/lib/lua/luci/apprpc/cellular.lua" 2>/dev/null || true
+            echo
+            echo '===== GCOM CBI FILES ====='
+            for f in "$root"/usr/lib/lua/luci/model/cbi/gcom/*.lua; do
+              [ -f "$f" ] || continue
+              echo "### $f"
+              sed -n '1,1200p' "$f"
+            done
+            echo
+            echo '===== DIAG/TTOOLS FILES ====='
+            find "$root/usr/lib/lua/luci" -type f | grep -Ei '/(diag|tools)/|diag\.htm|ping\.lua|traceroute\.lua' | while read -r f; do
+              echo "### $f"
+              sed -n '1,800p' "$f" 2>/dev/null || strings -a "$f" | head -800
+            done
+            echo
+            echo '===== EXACT FEATURE STRINGS IN CODE ====='
+            grep -RIna --binary-files=text -E 'AT Command|AirDump|Cellular Upgrade|TFTP|packet.?capture|tcpdump|factory preset|Generate|rom_research|mtk_factory_rw|telnetd|microcom'               "$root/usr/lib/lua" "$root/etc" "$root/usr/lib/4g" "$root/www" 2>/dev/null | head -3000 || true
+            echo
+            echo '===== RG500 A09 BINWALK ====='
+            sed -n '1,500p' out/P2_RG500_A09.bin.binwalk.txt
+            echo
+            echo '===== RG500 A09 DEV/DIAG STRINGS ====='
+            grep -Ei 'debug|factory|engineering|eng.?mode|test.?mode|diag|qxdm|adb|fastboot|edl|sahara|firehose|uart|console|shell|telnet|ssh|at\+|quectel|rg500|usb|pcie|dump|log' out/P2_RG500_A09.bin.keyword-strings.txt | head -3000 || true
+            echo
+            echo '===== CELLULARUPGRADE BINWALK ====='
+            sed -n '1,500p' out/R91-2.4.23b-20251208-CellularUpgrade.bin.binwalk.txt
+            echo
+            echo '===== CELLULARUPGRADE DEV/DIAG STRINGS ====='
+            grep -Ei 'debug|factory|engineering|eng.?mode|test.?mode|diag|qxdm|adb|fastboot|edl|sahara|firehose|uart|console|shell|telnet|ssh|at\+|quectel|rg500|usb|pcie|dump|log|CellularUpgrade' out/R91-2.4.23b-20251208-CellularUpgrade.bin.keyword-strings.txt | head -3000 || true
+          } > out/fu_7-P2-HIDDEN-CONTROLS-AUDIT.txt
+
+          cat out/fu_7-P2-HIDDEN-CONTROLS-AUDIT.txt
+          zip -q fu_7-P2-HIDDEN-CONTROLS-AUDIT.zip out/*
+      - name: Upload compact audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-P2-HIDDEN-CONTROLS-AUDIT
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            fu_7-P2-HIDDEN-CONTROLS-AUDIT.zip
+            out/fu_7-P2-HIDDEN-CONTROLS-AUDIT.txt
