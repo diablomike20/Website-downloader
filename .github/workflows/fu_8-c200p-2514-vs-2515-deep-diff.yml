@@ -20,9 +20,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           OUT="fu_8-C200P-2514-VS-2515-DEEP-DIFF-01"
-          mkdir -p "$OUT"/{input,rootfs,report,selected}
+          mkdir -p "$OUT/input" "$OUT/rootfs" "$OUT/report" "$OUT/selected"
 
           OLD_URL="https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.14-20260618-150931-flash.zip"
           NEW_URL="https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.15-20260629-160214-flash.zip"
@@ -38,26 +37,15 @@ jobs:
             d="$OUT/input/$tag"
             mkdir -p "$d"
             unzip -o "$zip" -d "$d" >/dev/null
-
             bin="$(find "$d" -maxdepth 1 -type f -name '*.bin' | head -n1)"
-            [ -n "$bin" ] || { echo "BIN missing for $tag" >&2; exit 1; }
-
+            test -n "$bin"
             sqoff="$(grep -aob -m1 'hsqs' "$bin" | cut -d: -f1)"
-            [ -n "$sqoff" ] || { echo "SquashFS missing for $tag" >&2; exit 1; }
-
-            fssize="$(python3 - "$bin" "$sqoff" <<'PY'
-import struct,sys
-p=sys.argv[1]; off=int(sys.argv[2])
-with open(p,'rb') as f:
-    f.seek(off+40)
-    print(struct.unpack('<Q',f.read(8))[0])
-PY
-)"
+            test -n "$sqoff"
+            fssize="$(python3 -c 'import struct,sys; f=open(sys.argv[1],"rb"); f.seek(int(sys.argv[2])+40); print(struct.unpack("<Q",f.read(8))[0])' "$bin" "$sqoff")"
             dd if="$bin" of="$OUT/input/$tag.squashfs" bs=1 skip="$sqoff" count="$fssize" status=none
             sudo rm -rf "$OUT/rootfs/$tag"
             sudo unsquashfs -f -d "$OUT/rootfs/$tag" "$OUT/input/$tag.squashfs" >/dev/null
             sudo chown -R "$(id -u):$(id -g)" "$OUT/rootfs/$tag"
-
             {
               echo "tag=$tag"
               echo "source_url=$( [ "$tag" = old ] && echo "$OLD_URL" || echo "$NEW_URL" )"
@@ -73,7 +61,6 @@ PY
               echo "rootfs_symlinks=$(find "$OUT/rootfs/$tag" -type l | wc -l)"
               echo "rootfs_dirs=$(find "$OUT/rootfs/$tag" -type d | wc -l)"
             } > "$OUT/report/$tag-identity.txt"
-
             unsquashfs -s "$OUT/input/$tag.squashfs" > "$OUT/report/$tag-squashfs-superblock.txt"
             file "$zip" "$bin" "$OUT/input/$tag.squashfs" > "$OUT/report/$tag-file-types.txt"
           }
@@ -81,76 +68,85 @@ PY
           extract_one old "$OUT/input/old.zip"
           extract_one new "$OUT/input/new.zip"
 
-          python3 - "$OUT" <<'PY'
-import os,sys,hashlib,csv,stat
-from pathlib import Path
-out=Path(sys.argv[1])
+          cat > /tmp/fu8_manifest_diff.py <<'PY'
+          import os, sys, hashlib, csv, stat
+          from pathlib import Path
 
-def manifest(root):
-    root=Path(root)
-    m={}
-    for p in sorted(root.rglob('*')):
-        rel='/' + str(p.relative_to(root))
-        st=p.lstat()
-        mode=oct(stat.S_IMODE(st.st_mode))
-        if p.is_symlink():
-            m[rel]=('L',mode,os.readlink(p),'')
-        elif p.is_file():
-            h=hashlib.sha256()
-            with p.open('rb') as f:
-                for b in iter(lambda:f.read(1024*1024),b''): h.update(b)
-            m[rel]=('F',mode,str(st.st_size),h.hexdigest())
-        elif p.is_dir():
-            m[rel]=('D',mode,'','')
-    return m
+          out = Path(sys.argv[1])
 
-old=manifest(out/'rootfs/old')
-new=manifest(out/'rootfs/new')
-with (out/'report/old-manifest.csv').open('w',newline='') as f:
-    w=csv.writer(f);w.writerow(['path','type','mode','size_or_target','sha256'])
-    for k,v in old.items():w.writerow([k,*v])
-with (out/'report/new-manifest.csv').open('w',newline='') as f:
-    w=csv.writer(f);w.writerow(['path','type','mode','size_or_target','sha256'])
-    for k,v in new.items():w.writerow([k,*v])
+          def manifest(root):
+              root = Path(root)
+              m = {}
+              for p in sorted(root.rglob('*')):
+                  rel = '/' + str(p.relative_to(root))
+                  st = p.lstat()
+                  mode = oct(stat.S_IMODE(st.st_mode))
+                  if p.is_symlink():
+                      m[rel] = ('L', mode, os.readlink(p), '')
+                  elif p.is_file():
+                      h = hashlib.sha256()
+                      with p.open('rb') as f:
+                          for b in iter(lambda: f.read(1024 * 1024), b''):
+                              h.update(b)
+                      m[rel] = ('F', mode, str(st.st_size), h.hexdigest())
+                  elif p.is_dir():
+                      m[rel] = ('D', mode, '', '')
+              return m
 
-only_old=sorted(set(old)-set(new))
-only_new=sorted(set(new)-set(old))
-common=sorted(set(old)&set(new))
-changed=[k for k in common if old[k]!=new[k]]
-same=[k for k in common if old[k]==new[k]]
+          old = manifest(out / 'rootfs/old')
+          new = manifest(out / 'rootfs/new')
+          only_old = sorted(set(old) - set(new))
+          only_new = sorted(set(new) - set(old))
+          common = sorted(set(old) & set(new))
+          changed = [k for k in common if old[k] != new[k]]
+          same = [k for k in common if old[k] == new[k]]
 
-with (out/'report/tree-diff.csv').open('w',newline='') as f:
-    w=csv.writer(f)
-    w.writerow(['status','path','old_type','old_mode','old_size_or_target','old_sha256','new_type','new_mode','new_size_or_target','new_sha256'])
-    for k in only_old:w.writerow(['ONLY_2.5.14',k,*old[k],'','','',''])
-    for k in only_new:w.writerow(['ONLY_2.5.15',k,'','','','',*new[k]])
-    for k in changed:w.writerow(['CHANGED',k,*old[k],*new[k]])
+          for name, data in [('old-manifest.csv', old), ('new-manifest.csv', new)]:
+              with (out / 'report' / name).open('w', newline='') as f:
+                  w = csv.writer(f)
+                  w.writerow(['path','type','mode','size_or_target','sha256'])
+                  for k, v in data.items():
+                      w.writerow([k, *v])
 
-with (out/'report/summary.txt').open('w') as f:
-    f.write(f'old_entries={len(old)}\nnew_entries={len(new)}\n')
-    f.write(f'only_old={len(only_old)}\nonly_new={len(only_new)}\n')
-    f.write(f'changed_common={len(changed)}\nidentical_common={len(same)}\n')
+          with (out / 'report/tree-diff.csv').open('w', newline='') as f:
+              w = csv.writer(f)
+              w.writerow(['status','path','old_type','old_mode','old_size_or_target','old_sha256','new_type','new_mode','new_size_or_target','new_sha256'])
+              for k in only_old:
+                  w.writerow(['ONLY_2.5.14', k, *old[k], '', '', '', ''])
+              for k in only_new:
+                  w.writerow(['ONLY_2.5.15', k, '', '', '', '', *new[k]])
+              for k in changed:
+                  w.writerow(['CHANGED', k, *old[k], *new[k]])
 
-targets=[
- '/usr/lib/lua/luci/controller/',
- '/usr/lib/lua/luci/model/',
- '/usr/lib/lua/luci/view/',
- '/usr/lib/lua/luci/apprpc/',
- '/etc/init.d/',
- '/etc/hotplug.d/',
- '/usr/lib/4g/',
- '/usr/bin/',
- '/usr/sbin/',
- '/etc/uci-defaults/',
-]
-with (out/'report/targeted-diff.txt').open('w') as f:
-    for k in only_old:
-        if any(k.startswith(x) for x in targets): f.write('ONLY_2.5.14 '+k+'\n')
-    for k in only_new:
-        if any(k.startswith(x) for x in targets): f.write('ONLY_2.5.15 '+k+'\n')
-    for k in changed:
-        if any(k.startswith(x) for x in targets): f.write('CHANGED '+k+'\n')
-PY
+          targets = (
+              '/usr/lib/lua/luci/controller/',
+              '/usr/lib/lua/luci/model/',
+              '/usr/lib/lua/luci/view/',
+              '/usr/lib/lua/luci/apprpc/',
+              '/etc/init.d/',
+              '/etc/hotplug.d/',
+              '/usr/lib/4g/',
+              '/usr/bin/',
+              '/usr/sbin/',
+              '/etc/uci-defaults/',
+          )
+
+          with (out / 'report/targeted-diff.txt').open('w') as f:
+              for status_name, seq in [('ONLY_2.5.14', only_old), ('ONLY_2.5.15', only_new), ('CHANGED', changed)]:
+                  for k in seq:
+                      if k.startswith(targets):
+                          f.write(status_name + ' ' + k + '\n')
+
+          with (out / 'report/summary.txt').open('w') as f:
+              f.write(f'old_entries={len(old)}\n')
+              f.write(f'new_entries={len(new)}\n')
+              f.write(f'only_old={len(only_old)}\n')
+              f.write(f'only_new={len(only_new)}\n')
+              f.write(f'changed_common={len(changed)}\n')
+              f.write(f'identical_common={len(same)}\n')
+          PY
+
+          python3 /tmp/fu8_manifest_diff.py "$OUT"
 
           for tag in old new; do
             root="$OUT/rootfs/$tag"
@@ -159,10 +155,10 @@ PY
               grep -RIna -m50 -E '2\.5\.(14|15)|C200P|R74' "$root/etc" "$root/usr" 2>/dev/null || true
               echo
               echo "===== $tag markers/capabilities ====="
-              grep -RIna -m500 -E 'rom_develop|rom_research|testonly|batchcmd|mesh_tcpdump|mesh_diag|dropbear|telnet|sshinfo|cloud.?manage|cloud_management|cmagent|cmsd|debug_mode|DEBUG MODE|factorytest|factory|forbidden'                 "$root/etc" "$root/usr" "$root/www" 2>/dev/null || true
+              grep -RIna -m500 -E 'rom_develop|rom_research|testonly|batchcmd|mesh_tcpdump|mesh_diag|dropbear|telnet|sshinfo|cloud.?manage|cloud_management|cmagent|cmsd|debug_mode|DEBUG MODE|factorytest|factory|forbidden' "$root/etc" "$root/usr" "$root/www" 2>/dev/null || true
             } > "$OUT/report/$tag-marker-grep.txt"
 
-            for p in               usr/lib/lua/luci/controller               usr/lib/lua/luci/model               usr/lib/lua/luci/view               usr/lib/lua/luci/apprpc               etc/init.d etc/hotplug.d usr/lib/4g; do
+            for p in usr/lib/lua/luci/controller usr/lib/lua/luci/model usr/lib/lua/luci/view usr/lib/lua/luci/apprpc etc/init.d etc/hotplug.d usr/lib/4g; do
               if [ -e "$root/$p" ]; then
                 mkdir -p "$OUT/selected/$tag/$(dirname "$p")"
                 cp -a "$root/$p" "$OUT/selected/$tag/$p"
@@ -171,19 +167,21 @@ PY
           done
 
           {
-            echo "===== identity old ====="; cat "$OUT/report/old-identity.txt"
-            echo "===== identity new ====="; cat "$OUT/report/new-identity.txt"
-            echo "===== summary ====="; cat "$OUT/report/summary.txt"
-            echo "===== targeted diff ====="; cat "$OUT/report/targeted-diff.txt"
+            echo "===== identity old ====="
+            cat "$OUT/report/old-identity.txt"
+            echo "===== identity new ====="
+            cat "$OUT/report/new-identity.txt"
+            echo "===== summary ====="
+            cat "$OUT/report/summary.txt"
+            echo "===== targeted diff ====="
+            cat "$OUT/report/targeted-diff.txt"
           } > "$OUT/fu_8-C200P-2514-VS-2515-DEEP-DIFF-01.txt"
 
-          # Do not upload full rootfs trees; preserve faithful rootfs tarballs + selected source trees.
           sudo tar --numeric-owner -czf "$OUT/fu_8-C200P-2.5.14-rootfs.tar.gz" -C "$OUT/rootfs" old
           sudo tar --numeric-owner -czf "$OUT/fu_8-C200P-2.5.15-rootfs.tar.gz" -C "$OUT/rootfs" new
           sudo chown "$(id -u):$(id -g)" "$OUT"/*.tar.gz
           rm -rf "$OUT/rootfs" "$OUT/input/old" "$OUT/input/new"
           rm -f "$OUT/input/old.zip" "$OUT/input/new.zip"
-
           (cd "$OUT" && find . -type f -print0 | sort -z | xargs -0 sha256sum > fu_8-SHA256SUMS.txt)
 
       - name: Upload FU8 C200P deep diff
