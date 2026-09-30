@@ -11,69 +11,55 @@ jobs:
   capture:
     runs-on: ubuntu-latest
     steps:
-      - name: Recover exact first-party and community URLs
+      - name: Capture exact first-party stable and documented beta evidence
         shell: bash
         run: |
-          set -euo pipefail
+          set -u
           OUT="fu_8-P2-EXACT-CAPTURE"
           mkdir -p "$OUT"
           cd "$OUT"
 
-          FORUM="https://www.cudyforum.it/d/30-p2-5g-router-wifi-6-ax3000"
-          CUDY="https://www.cudy.com/en-oc/pages/download-center/p2-1-0"
+          STABLE_URL="https://www.cudy.com/cdn/shop/files/P2-R91-2.4.29-20260421-190344-sysupgrade.zip"
+          FORUM_API="https://www.cudyforum.it/api/discussions/30"
 
-          curl -L --fail --retry 3 -A 'Mozilla/5.0' -o forum.html "$FORUM"
-          curl -L --fail --retry 3 -A 'Mozilla/5.0' -o cudy.html "$CUDY"
-
-          grep -oE 'https://mega\.nz/file/qNgxhC6I#[A-Za-z0-9_-]+' forum.html | sort -u > fu_8-beta-mega-links.txt || true
-          grep -oE 'href="[^"]*P2-R91-2\.4\.29-20260421-190344-sysupgrade\.zip[^"]*"' cudy.html | sed -E 's/^href="//;s/"$//' | sort -u > fu_8-stable-hrefs.txt || true
-          grep -oE 'https?://[^"[:space:]<>]*P2-R91-2\.4\.29-20260421-190344-sysupgrade\.zip[^"[:space:]<>]*' cudy.html | sort -u >> fu_8-stable-hrefs.txt || true
-          sort -u -o fu_8-stable-hrefs.txt fu_8-stable-hrefs.txt
-
-          echo "=== beta MEGA exact ===" > fu_8-link-report.txt
-          cat fu_8-beta-mega-links.txt >> fu_8-link-report.txt || true
-          echo "=== stable hrefs exact ===" >> fu_8-link-report.txt
-          cat fu_8-stable-hrefs.txt >> fu_8-link-report.txt || true
-
-          STABLE=""
-          while IFS= read -r href; do
-            [ -z "$href" ] && continue
-            case "$href" in
-              http*) STABLE="$href" ;;
-              //*) STABLE="https:$href" ;;
-              /*) STABLE="https://www.cudy.com$href" ;;
-              *) STABLE="https://www.cudy.com/$href" ;;
-            esac
-            break
-          done < fu_8-stable-hrefs.txt
-
-          if [ -n "$STABLE" ]; then
-            echo "STABLE_URL=$STABLE" | tee fu_8-stable-url.txt
-            if curl -L --fail --retry 3 -o fu_8-P2-R91-2.4.29-stable.zip "$STABLE"; then
-              sha256sum fu_8-P2-R91-2.4.29-stable.zip > fu_8-stable-sha256.txt
-              md5sum fu_8-P2-R91-2.4.29-stable.zip > fu_8-stable-md5.txt
-              stat -c 'STABLE_BYTES=%s' fu_8-P2-R91-2.4.29-stable.zip > fu_8-stable-size.txt
-              file fu_8-P2-R91-2.4.29-stable.zip > fu_8-stable-file.txt
-              unzip -t fu_8-P2-R91-2.4.29-stable.zip > fu_8-stable-unzip-test.txt 2>&1 || true
-              mkdir stable-extracted
-              unzip -o fu_8-P2-R91-2.4.29-stable.zip -d stable-extracted >/dev/null || true
-              find stable-extracted -type f -print0 | sort -z | xargs -0 -r sha256sum > fu_8-stable-inner-sha256.txt
-            else
-              echo "STABLE_DOWNLOAD=FAIL" > fu_8-stable-result.txt
-            fi
+          echo "STABLE_URL=$STABLE_URL" > fu_8-stable-url.txt
+          if curl -L --fail --retry 3 -A 'Mozilla/5.0' -o fu_8-P2-R91-2.4.29-stable.zip "$STABLE_URL"; then
+            echo "STABLE_DOWNLOAD=PASS" > fu_8-stable-result.txt
+            sha256sum fu_8-P2-R91-2.4.29-stable.zip > fu_8-stable-sha256.txt
+            md5sum fu_8-P2-R91-2.4.29-stable.zip > fu_8-stable-md5.txt
+            stat -c 'STABLE_BYTES=%s' fu_8-P2-R91-2.4.29-stable.zip > fu_8-stable-size.txt
+            file fu_8-P2-R91-2.4.29-stable.zip > fu_8-stable-file.txt
+            unzip -t fu_8-P2-R91-2.4.29-stable.zip > fu_8-stable-unzip-test.txt 2>&1 || true
+            mkdir -p stable-extracted
+            unzip -o fu_8-P2-R91-2.4.29-stable.zip -d stable-extracted >/dev/null 2>&1 || true
+            find stable-extracted -type f -print0 | sort -z | xargs -0 -r sha256sum > fu_8-stable-inner-sha256.txt
           else
-            echo "STABLE_URL_NOT_RECOVERED" > fu_8-stable-result.txt
+            echo "STABLE_DOWNLOAD=FAIL" > fu_8-stable-result.txt
           fi
 
-          BETA=$(head -1 fu_8-beta-mega-links.txt || true)
+          if curl -L --fail --retry 3 -A 'Mozilla/5.0' -H 'Accept: application/vnd.api+json' -o forum-api.json "$FORUM_API"; then
+            echo "FORUM_API=PASS" > fu_8-forum-api-result.txt
+            grep -aoE 'https:\\/\\/mega\.nz\\/file\\/qNgxhC6I#[A-Za-z0-9_-]+' forum-api.json |
+              sed 's#\\/#/#g' | sort -u > fu_8-beta-mega-links.txt || true
+            if [ ! -s fu_8-beta-mega-links.txt ]; then
+              grep -aoE 'https://mega\.nz/file/qNgxhC6I#[A-Za-z0-9_-]+' forum-api.json |
+                sort -u > fu_8-beta-mega-links.txt || true
+            fi
+          else
+            echo "FORUM_API=FAIL" > fu_8-forum-api-result.txt
+            : > fu_8-beta-mega-links.txt
+          fi
+
+          BETA=$(head -1 fu_8-beta-mega-links.txt 2>/dev/null || true)
           if [ -n "$BETA" ]; then
-            echo "BETA_MEGA_URL=$BETA" | tee fu_8-beta-url.txt
-            sudo apt-get update -qq
+            echo "BETA_MEGA_URL=$BETA" > fu_8-beta-url.txt
+            sudo apt-get update -qq || true
             if sudo apt-get install -y -qq megatools; then
-              mkdir beta-download
+              mkdir -p beta-download
               if megadl --path=beta-download "$BETA"; then
-                find beta-download -type f -print0 | sort -z | xargs -0 -r sha256sum > fu_8-beta-sha256.txt
+                echo "BETA_DOWNLOAD=PASS" > fu_8-beta-result.txt
                 find beta-download -type f -printf '%P\t%s\n' | sort > fu_8-beta-files.txt
+                find beta-download -type f -print0 | sort -z | xargs -0 -r sha256sum > fu_8-beta-sha256.txt
                 for f in beta-download/*; do
                   [ -f "$f" ] || continue
                   file "$f" >> fu_8-beta-filetypes.txt
@@ -81,7 +67,6 @@ jobs:
                     *.zip) unzip -t "$f" >> fu_8-beta-unzip-test.txt 2>&1 || true ;;
                   esac
                 done
-                echo "BETA_DOWNLOAD=PASS" > fu_8-beta-result.txt
               else
                 echo "BETA_DOWNLOAD=FAIL" > fu_8-beta-result.txt
               fi
@@ -92,7 +77,20 @@ jobs:
             echo "BETA_FULL_MEGA_URL_NOT_RECOVERED" > fu_8-beta-result.txt
           fi
 
-          sha256sum forum.html cudy.html > fu_8-source-page-sha256.txt
+          {
+            echo "=== stable ==="
+            cat fu_8-stable-result.txt 2>/dev/null || true
+            cat fu_8-stable-sha256.txt 2>/dev/null || true
+            echo "=== forum api ==="
+            cat fu_8-forum-api-result.txt 2>/dev/null || true
+            echo "=== beta exact link ==="
+            cat fu_8-beta-mega-links.txt 2>/dev/null || true
+            echo "=== beta ==="
+            cat fu_8-beta-result.txt 2>/dev/null || true
+            cat fu_8-beta-sha256.txt 2>/dev/null || true
+          } > fu_8-summary.txt
+
+          sha256sum forum-api.json 2>/dev/null > fu_8-source-page-sha256.txt || true
           echo "P2_EXACT_CAPTURE_DONE" > fu_8-result.txt
 
       - uses: actions/upload-artifact@v4
