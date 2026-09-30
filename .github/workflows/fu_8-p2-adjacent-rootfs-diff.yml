@@ -173,6 +173,20 @@ jobs:
             } >> ../results/fu_8-five-files-exact-content.txt
           done
 
+          # Exact adjacent cellular source deltas
+          cp stable-root/usr/lib/4g/detect.sh ../results/fu_8-stable-detect.sh
+          cp beta-root/usr/lib/4g/detect.sh ../results/fu_8-beta-detect.sh
+          cp stable-root/usr/lib/4g/quectel-5g.sh ../results/fu_8-stable-quectel-5g.sh
+          cp beta-root/usr/lib/4g/quectel-5g.sh ../results/fu_8-beta-quectel-5g.sh
+          diff -u stable-root/usr/lib/4g/detect.sh beta-root/usr/lib/4g/detect.sh > ../results/fu_8-detect-adjacent.diff || true
+          diff -u stable-root/usr/lib/4g/quectel-5g.sh beta-root/usr/lib/4g/quectel-5g.sh > ../results/fu_8-quectel-5g-adjacent.diff || true
+
+          # The only non-metadata changed common binary in the adjacent rootfs diff
+          strings -a -n 4 stable-root/usr/lib/libgetdns.so.10.1.2 | sort -u > ../results/fu_8-stable-libgetdns-strings.txt
+          strings -a -n 4 beta-root/usr/lib/libgetdns.so.10.1.2 | sort -u > ../results/fu_8-beta-libgetdns-strings.txt
+          comm -13 ../results/fu_8-stable-libgetdns-strings.txt ../results/fu_8-beta-libgetdns-strings.txt > ../results/fu_8-libgetdns-beta-only-strings.txt || true
+          comm -23 ../results/fu_8-stable-libgetdns-strings.txt ../results/fu_8-beta-libgetdns-strings.txt > ../results/fu_8-libgetdns-stable-only-strings.txt || true
+
           find stable-root/usr/lib/4g -type f -print0 2>/dev/null | sort -z | xargs -0 -r sha256sum | sed 's#  stable-root/#  /#' > ../results/fu_8-stable-4g-sha256.txt || true
           find beta-root/usr/lib/4g -type f -print0 2>/dev/null | sort -z | xargs -0 -r sha256sum | sed 's#  beta-root/#  /#' > ../results/fu_8-beta-4g-sha256.txt || true
           find stable-root/etc/hotplug.d -type f -print0 2>/dev/null | sort -z | xargs -0 -r sha256sum | sed 's#  stable-root/#  /#' > ../results/fu_8-stable-hotplug-sha256.txt || true
