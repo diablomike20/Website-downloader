@@ -54,7 +54,7 @@ jobs:
           STABLE_BIN="$(find "$OUT/src/stable-unzip" -type f -name '*.bin' | head -n1)"
           test -n "$STABLE_BIN"
 
-          UBI_OFF="$(grep -aob -m1 'UBI#' "$STABLE_BIN" | cut -d: -f1)"
+          UBI_OFF="$(grep -aob 'UBI#' "$STABLE_BIN" | head -n1 | cut -d: -f1)"
           test -n "$UBI_OFF"
           dd if="$STABLE_BIN" of="$OUT/src/stable.ubi" bs=1 skip="$UBI_OFF" status=none
           mkdir -p "$OUT/src/stable-ubi"
