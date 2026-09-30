@@ -1,0 +1,87 @@
+name: fu_8 C200P 2.5.15 artifact capture
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_8-c200p-2515-capture.yml"
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Capture first-party C200P 2.5.15 assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="fu_8-C200P-R74-2.5.15-20260629-160214"
+          mkdir -p "$OUT"
+          cd "$OUT"
+
+          URL_CANON="https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.15-20260629-160214-flash.zip"
+          URL_CN="https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.15-20260629-160214-flash_f8398315-c9da-474f-a69c-0150473613c4.zip?v=3806461865419376691"
+
+          : > fu_8-download-status.tsv
+          printf 'variant\turl\thttp_result\tfile\n' >> fu_8-download-status.tsv
+
+          fetch_one() {
+            variant="$1"; url="$2"; file="$3"
+            if curl -L --fail --retry 3 --retry-delay 2 -o "$file" "$url"; then
+              printf '%s\t%s\tOK\t%s\n' "$variant" "$url" "$file" >> fu_8-download-status.tsv
+              sha256sum "$file" >> fu_8-sha256.txt
+              md5sum "$file" >> fu_8-md5.txt
+              stat -c "$variant bytes=%s" "$file" >> fu_8-size.txt
+              file "$file" >> fu_8-file.txt
+              unzip -t "$file" >> fu_8-unzip-test.txt 2>&1
+              mkdir -p "extracted-$variant"
+              unzip -o "$file" -d "extracted-$variant" >/dev/null
+            else
+              rc=$?
+              rm -f "$file"
+              printf '%s\t%s\tFAIL_%s\t%s\n' "$variant" "$url" "$rc" "$file" >> fu_8-download-status.tsv
+            fi
+          }
+
+          fetch_one canonical "$URL_CANON" "fu_8-C200P-R74-2.5.15-canonical.zip"
+          fetch_one cn_uuid "$URL_CN" "fu_8-C200P-R74-2.5.15-cn-uuid.zip"
+
+          count=$(find . -maxdepth 1 -type f -name 'fu_8-C200P-R74-2.5.15-*.zip' | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "NO_FIRST_PARTY_2515_ASSET_CAPTURED" | tee fu_8-result.txt
+            exit 1
+          fi
+
+          if [ -f fu_8-C200P-R74-2.5.15-canonical.zip ] && [ -f fu_8-C200P-R74-2.5.15-cn-uuid.zip ]; then
+            if cmp -s fu_8-C200P-R74-2.5.15-canonical.zip fu_8-C200P-R74-2.5.15-cn-uuid.zip; then
+              echo "CANONICAL_AND_CN_OUTER_ZIP_BYTE_IDENTICAL=YES" | tee fu_8-alias-comparison.txt
+            else
+              echo "CANONICAL_AND_CN_OUTER_ZIP_BYTE_IDENTICAL=NO" | tee fu_8-alias-comparison.txt
+            fi
+          else
+            echo "ALIAS_COMPARISON=ONE_VARIANT_ONLY" | tee fu_8-alias-comparison.txt
+          fi
+
+          find extracted-* -type f -print0 2>/dev/null | sort -z | xargs -0 -r sha256sum > fu_8-extracted-sha256.txt
+          find extracted-* -type f -print0 2>/dev/null | sort -z | xargs -0 -r file > fu_8-extracted-filetypes.txt
+
+          for bin in $(find extracted-* -type f -name '*.bin' 2>/dev/null | sort); do
+            echo "=== $bin ===" >> fu_8-bin-info.txt
+            stat -c 'BIN_BYTES=%s' "$bin" >> fu_8-bin-info.txt
+            sha256sum "$bin" >> fu_8-bin-info.txt
+            md5sum "$bin" >> fu_8-bin-info.txt
+            file "$bin" >> fu_8-bin-info.txt
+            grep -aob 'hsqs' "$bin" | head -20 >> fu_8-squashfs-offsets.txt || true
+            grep -aob 'R74' "$bin" | head -50 >> fu_8-r74-offsets.txt || true
+            grep -aob '2.5.15' "$bin" | head -50 >> fu_8-version-offsets.txt || true
+          done
+
+          echo "C200P_2515_CAPTURE=PASS" | tee fu_8-result.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fu_8-C200P-R74-2.5.15-20260629-160214
+          path: fu_8-C200P-R74-2.5.15-20260629-160214
+          compression-level: 0
+          include-hidden-files: true
