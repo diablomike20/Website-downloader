@@ -103,6 +103,51 @@ def identify(payloads):
             f.write(f"{r['name']}\t{r['size']}\t{r['sha256']}\t{r['file']}\t{json.dumps(r['magics'])}\n")
     return rows
 
+def extract_ubi(rows):
+    roots=[]
+    for r in rows:
+        src=Path(r["path"])
+        offs=r["magics"].get("ubi",[])
+        if not offs: continue
+        off=offs[0]
+        sliced=WORK/(src.name+f".ubi_off_{off}.bin")
+        with open(src,"rb") as fi, open(sliced,"wb") as fo:
+            fi.seek(off); shutil.copyfileobj(fi,fo,1024*1024)
+        info=sh(["ubireader_display_info",str(sliced)])
+        (REPORT/(src.name+".ubi-info.txt")).write_text(info.stdout)
+        outimg=WORK/(src.name+".ubi-volumes")
+        outimg.mkdir(parents=True,exist_ok=True)
+        ex=sh(["ubireader_extract_images","-o",str(outimg),str(sliced)])
+        (REPORT/(src.name+".ubi-extract.log")).write_text(ex.stdout)
+        for vol in outimg.rglob("*"):
+            if not vol.is_file(): continue
+            try:
+                head=vol.read_bytes()[:4]
+            except: continue
+            if head==b"hsqs":
+                out=REPORT/"rootfs"/(src.name+"__ubi__"+vol.name)
+                rc=sh(["unsquashfs","-no-exit-code","-d",str(out),str(vol)])
+                (REPORT/"rootfs"/(out.name+".unsquashfs.log")).write_text(rc.stdout)
+                if out.exists() and any(out.iterdir()): roots.append(out)
+            elif head==b"UBI#":
+                pass
+        # ubireader_extract_files may directly extract UBIFS-based volumes too.
+        outf=REPORT/"rootfs"/(src.name+"__ubireader_files")
+        exf=sh(["ubireader_extract_files","-o",str(outf),str(sliced)])
+        (REPORT/"rootfs"/(src.name+".ubireader-files.log")).write_text(exf.stdout)
+        if outf.exists():
+            for d in outf.rglob("*"):
+                if d.is_dir() and any(d.iterdir()):
+                    # collect only directories that look like Linux roots
+                    if (d/"etc").exists() and ((d/"www").exists() or (d/"usr").exists()):
+                        roots.append(d)
+    # de-dup
+    seen=set(); out=[]
+    for r in roots:
+        s=str(r)
+        if s not in seen:seen.add(s);out.append(r)
+    return out
+
 def extract_squashfs(rows):
     roots=[]
     for r in rows:
@@ -193,6 +238,17 @@ recursive_unpack()
 payloads=collect_payloads()
 rows=identify(payloads)
 roots=extract_squashfs(rows)
+roots.extend(extract_ubi(rows))
+# Raw beta-only string delta independent of filesystem extraction.
+stable=[r for r in rows if "2.4.22-20251204-184925" in r["name"]]
+beta=[r for r in rows if "2.4.29b-20260422-101502" in r["name"]]
+if stable and beta:
+    sa=set((REPORT/(stable[0]["name"]+".strings.txt")).read_text(errors="ignore").splitlines())
+    sb=set((REPORT/(beta[0]["name"]+".strings.txt")).read_text(errors="ignore").splitlines())
+    only=sorted(sb-sa)
+    (REPORT/"beta-only-strings.txt").write_text("\n".join(only))
+    rx=re.compile(r"developer|development|debug|factory|engineering|diagnostic|diag|packet.?capture|pcap|tcpdump|telnet|dropbear|ssh|uart|console|shell|terminal|hidden|feature|capabilit|resolver|rpcd|ubus|mtd|signature|verify|md5|rsa|test.?mode|eng.?mode|factory.?mode|logread|root|admin|support|at\+|gcom|modem|cellular",re.I)
+    (REPORT/"beta-only-interesting-strings.txt").write_text("\n".join(x for x in only if rx.search(x)))
 audit_rootfs(roots)
 diff=compare_roots(roots)
 make_summary(rows,diff)
