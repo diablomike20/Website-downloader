@@ -98,7 +98,7 @@ jobs:
           sudo unsquashfs -no-exit-code -d "$PWD/beta-root" "$BETA_ROOTVOL" > ../results/fu_8-beta-unsquashfs.log 2>&1
           echo "MILESTONE=rootfs_extracted" >> "$P"
 
-          python3 - <<'PY'
+          sudo python3 - <<'PY'
           import os,stat,hashlib,csv,json
           def scan(root):
               out={}
