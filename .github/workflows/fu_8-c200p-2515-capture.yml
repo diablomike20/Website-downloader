@@ -112,8 +112,8 @@ jobs:
 
           for marker in 'batchcmd' 'mesh_tcpdump' 'mesh_diag' 'rom_develop' 'rom_research' 'rom_release' 'debug_mode' 'factorytest' 'cloud-manage' 'cloud management' 'sshinfo'; do
             safe=$(echo "$marker" | tr ' /' '__')
-            grep -RIal -- "$marker" root14 2>/dev/null | sed 's#^root14/##' | sort > "../results/fu_8-marker-${safe}-2514.txt" || true
-            grep -RIal -- "$marker" root15 2>/dev/null | sed 's#^root15/##' | sort > "../results/fu_8-marker-${safe}-2515.txt" || true
+            grep -rial --devices=skip --binary-files=without-match -- "$marker" root14 2>/dev/null | sed 's#^root14/##' | sort > "../results/fu_8-marker-${safe}-2514.txt" || true
+            grep -rial --devices=skip --binary-files=without-match -- "$marker" root15 2>/dev/null | sed 's#^root15/##' | sort > "../results/fu_8-marker-${safe}-2515.txt" || true
           done
 
           find root14/usr/lib/lua/luci -printf '%y %P -> %l\n' 2>/dev/null | sort > ../results/fu_8-luci-tree-2514.txt || true
