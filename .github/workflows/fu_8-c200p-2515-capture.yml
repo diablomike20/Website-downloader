@@ -1,4 +1,4 @@
-name: fu_8 C200P 2.5.15 artifact capture
+name: fu_8 C200P 2.5.14 vs 2.5.15 rootfs diff
 
 on:
   push:
@@ -8,80 +8,122 @@ on:
       - ".github/workflows/fu_8-c200p-2515-capture.yml"
 
 jobs:
-  capture:
+  diff:
     runs-on: ubuntu-latest
     steps:
-      - name: Capture first-party C200P 2.5.15 assets
+      - name: Install exact extraction tools
         shell: bash
         run: |
           set -euo pipefail
-          OUT="fu_8-C200P-R74-2.5.15-20260629-160214"
-          mkdir -p "$OUT"
-          cd "$OUT"
+          sudo apt-get update -qq
+          sudo apt-get install -y squashfs-tools file xz-utils unzip
 
-          URL_CANON="https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.15-20260629-160214-flash.zip"
-          URL_CN="https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.15-20260629-160214-flash_f8398315-c9da-474f-a69c-0150473613c4.zip?v=3806461865419376691"
+      - name: Download verify extract and diff exact C200P builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="fu_8-C200P-R74-2.5.14-vs-2.5.15-rootfs-diff"
+          mkdir -p "$OUT/work" "$OUT/results"
+          cd "$OUT/work"
 
-          : > fu_8-download-status.tsv
-          printf 'variant\turl\thttp_result\tfile\n' >> fu_8-download-status.tsv
+          URL14="https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.14-20260618-150931-flash.zip"
+          URL15="https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.15-20260629-160214-flash.zip"
+          curl -L --fail --retry 3 --retry-delay 2 -o 2514.zip "$URL14"
+          curl -L --fail --retry 3 --retry-delay 2 -o 2515.zip "$URL15"
 
-          fetch_one() {
-            variant="$1"; url="$2"; file="$3"
-            if curl -L --fail --retry 3 --retry-delay 2 -o "$file" "$url"; then
-              printf '%s\t%s\tOK\t%s\n' "$variant" "$url" "$file" >> fu_8-download-status.tsv
-              sha256sum "$file" >> fu_8-sha256.txt
-              md5sum "$file" >> fu_8-md5.txt
-              stat -c "$variant bytes=%s" "$file" >> fu_8-size.txt
-              file "$file" >> fu_8-file.txt
-              unzip -t "$file" >> fu_8-unzip-test.txt 2>&1
-              mkdir -p "extracted-$variant"
-              unzip -o "$file" -d "extracted-$variant" >/dev/null
-            else
-              rc=$?
-              rm -f "$file"
-              printf '%s\t%s\tFAIL_%s\t%s\n' "$variant" "$url" "$rc" "$file" >> fu_8-download-status.tsv
-            fi
-          }
+          echo "a4f5f6494bcbdf41bfcd8573a22531fbd2115b5cb2769f5f44da213a900a7e98  2514.zip" | sha256sum -c -
+          echo "04fe2d3d59de6ee4e66e56fea010038ea033feac50e418148ee2528f5e08ed56  2515.zip" | sha256sum -c -
 
-          fetch_one canonical "$URL_CANON" "fu_8-C200P-R74-2.5.15-canonical.zip"
-          fetch_one cn_uuid "$URL_CN" "fu_8-C200P-R74-2.5.15-cn-uuid.zip"
+          unzip -q 2514.zip -d source14
+          unzip -q 2515.zip -d source15
+          BIN14=$(find source14 -type f -name '*.bin' | head -1)
+          BIN15=$(find source15 -type f -name '*.bin' | head -1)
+          echo "8ba6c51d13d72d2871a1b5e8bbcb4318c2fd4234898f8c1e9e6c30502913e0e8  $BIN14" | sha256sum -c -
+          echo "16a08d1cdf7e4714fc093d19f4fd3f38d1ffa0caa09d08652c885974565b54aa  $BIN15" | sha256sum -c -
 
-          count=$(find . -maxdepth 1 -type f -name 'fu_8-C200P-R74-2.5.15-*.zip' | wc -l)
-          if [ "$count" -eq 0 ]; then
-            echo "NO_FIRST_PARTY_2515_ASSET_CAPTURED" | tee fu_8-result.txt
-            exit 1
-          fi
+          S14=$(grep -aob -m1 'hsqs' "$BIN14" | cut -d: -f1)
+          S15=$(grep -aob -m1 'hsqs' "$BIN15" | cut -d: -f1)
+          printf '2514_SQUASH_DEC=%s\n2514_SQUASH_HEX=0x%X\n2515_SQUASH_DEC=%s\n2515_SQUASH_HEX=0x%X\n' "$S14" "$S14" "$S15" "$S15" > ../results/fu_8-layout.txt
 
-          if [ -f fu_8-C200P-R74-2.5.15-canonical.zip ] && [ -f fu_8-C200P-R74-2.5.15-cn-uuid.zip ]; then
-            if cmp -s fu_8-C200P-R74-2.5.15-canonical.zip fu_8-C200P-R74-2.5.15-cn-uuid.zip; then
-              echo "CANONICAL_AND_CN_OUTER_ZIP_BYTE_IDENTICAL=YES" | tee fu_8-alias-comparison.txt
-            else
-              echo "CANONICAL_AND_CN_OUTER_ZIP_BYTE_IDENTICAL=NO" | tee fu_8-alias-comparison.txt
-            fi
-          else
-            echo "ALIAS_COMPARISON=ONE_VARIANT_ONLY" | tee fu_8-alias-comparison.txt
-          fi
+          dd if="$BIN14" of=root14.squashfs bs=1 skip="$S14" status=none
+          dd if="$BIN15" of=root15.squashfs bs=1 skip="$S15" status=none
+          unsquashfs -s root14.squashfs > ../results/fu_8-squashfs-2514.txt 2>&1
+          unsquashfs -s root15.squashfs > ../results/fu_8-squashfs-2515.txt 2>&1
 
-          find extracted-* -type f -print0 2>/dev/null | sort -z | xargs -0 -r sha256sum > fu_8-extracted-sha256.txt
-          find extracted-* -type f -print0 2>/dev/null | sort -z | xargs -0 -r file > fu_8-extracted-filetypes.txt
+          mkdir root14 root15
+          sudo unsquashfs -f -d "$PWD/root14" root14.squashfs > ../results/fu_8-unsquashfs-2514.log 2>&1
+          sudo unsquashfs -f -d "$PWD/root15" root15.squashfs > ../results/fu_8-unsquashfs-2515.log 2>&1
 
-          for bin in $(find extracted-* -type f -name '*.bin' 2>/dev/null | sort); do
-            echo "=== $bin ===" >> fu_8-bin-info.txt
-            stat -c 'BIN_BYTES=%s' "$bin" >> fu_8-bin-info.txt
-            sha256sum "$bin" >> fu_8-bin-info.txt
-            md5sum "$bin" >> fu_8-bin-info.txt
-            file "$bin" >> fu_8-bin-info.txt
-            grep -aob 'hsqs' "$bin" | head -20 >> fu_8-squashfs-offsets.txt || true
-            grep -aob 'R74' "$bin" | head -50 >> fu_8-r74-offsets.txt || true
-            grep -aob '2.5.15' "$bin" | head -50 >> fu_8-version-offsets.txt || true
+          sudo tar --numeric-owner -czf ../results/fu_8-C200P-2.5.14-rootfs.tar.gz root14
+          sudo tar --numeric-owner -czf ../results/fu_8-C200P-2.5.15-rootfs.tar.gz root15
+
+          sudo python3 - <<'PY'
+          import os,stat,hashlib,csv,json
+          def scan(root):
+              out={}
+              for base,dirs,files in os.walk(root,topdown=True,followlinks=False):
+                  for n in dirs+files:
+                      p=os.path.join(base,n); rel=os.path.relpath(p,root)
+                      try: st=os.lstat(p)
+                      except FileNotFoundError: continue
+                      m=st.st_mode
+                      if stat.S_ISREG(m):
+                          typ='file'; h=hashlib.sha256(open(p,'rb').read()).hexdigest(); target=''
+                      elif stat.S_ISDIR(m): typ='dir'; h=''; target=''
+                      elif stat.S_ISLNK(m): typ='symlink'; h=''; target=os.readlink(p)
+                      elif stat.S_ISCHR(m): typ='char'; h=''; target=f'{os.major(st.st_rdev)}:{os.minor(st.st_rdev)}'
+                      elif stat.S_ISBLK(m): typ='block'; h=''; target=f'{os.major(st.st_rdev)}:{os.minor(st.st_rdev)}'
+                      elif stat.S_ISFIFO(m): typ='fifo'; h=''; target=''
+                      elif stat.S_ISSOCK(m): typ='socket'; h=''; target=''
+                      else: typ='other'; h=''; target=''
+                      out[rel]={'type':typ,'mode':oct(stat.S_IMODE(m)),'uid':st.st_uid,'gid':st.st_gid,'size':st.st_size,'sha256':h,'target':target}
+              return out
+          A=scan('root14'); B=scan('root15')
+          fields=['path','status','type14','type15','mode14','mode15','uid14','uid15','gid14','gid15','size14','size15','sha14','sha15','target14','target15']
+          counts={}
+          with open('../results/fu_8-rootfs-diff.csv','w',newline='') as f:
+              w=csv.writer(f); w.writerow(fields)
+              for p in sorted(set(A)|set(B)):
+                  a=A.get(p); b=B.get(p)
+                  if a is None: s='ADDED'
+                  elif b is None: s='REMOVED'
+                  elif a==b: s='UNCHANGED'
+                  else: s='CHANGED'
+                  counts[s]=counts.get(s,0)+1
+                  a=a or {}; b=b or {}
+                  w.writerow([p,s,a.get('type',''),b.get('type',''),a.get('mode',''),b.get('mode',''),a.get('uid',''),b.get('uid',''),a.get('gid',''),b.get('gid',''),a.get('size',''),b.get('size',''),a.get('sha256',''),b.get('sha256',''),a.get('target',''),b.get('target','')])
+          with open('../results/fu_8-rootfs-diff-summary.txt','w') as f:
+              f.write(json.dumps(counts,sort_keys=True)+'\n')
+              f.write(f'total14={len(A)} total15={len(B)}\n')
+          focused=('usr/lib/lua/luci/','www/','etc/','usr/lib/4g/','usr/bin/','usr/sbin/')
+          with open('../results/fu_8-rootfs-focused-delta.txt','w') as f:
+              for p in sorted(set(A)|set(B)):
+                  a=A.get(p);b=B.get(p)
+                  if a!=b and p.startswith(focused):
+                      f.write(f'{p}\t{("ADDED" if a is None else "REMOVED" if b is None else "CHANGED")}\n')
+          for ver,data in [('2514',A),('2515',B)]:
+              with open(f'../results/fu_8-manifest-{ver}.csv','w',newline='') as f:
+                  w=csv.writer(f);w.writerow(['path','type','mode','uid','gid','size','sha256','target'])
+                  for p in sorted(data):
+                      x=data[p];w.writerow([p,x['type'],x['mode'],x['uid'],x['gid'],x['size'],x['sha256'],x['target']])
+          PY
+
+          sudo chown -R "$(id -u):$(id -g)" ../results
+
+          for marker in 'batchcmd' 'mesh_tcpdump' 'mesh_diag' 'rom_develop' 'rom_research' 'rom_release' 'debug_mode' 'factorytest' 'cloud-manage' 'cloud management' 'sshinfo'; do
+            safe=$(echo "$marker" | tr ' /' '__')
+            grep -RIal -- "$marker" root14 2>/dev/null | sed 's#^root14/##' | sort > "../results/fu_8-marker-${safe}-2514.txt" || true
+            grep -RIal -- "$marker" root15 2>/dev/null | sed 's#^root15/##' | sort > "../results/fu_8-marker-${safe}-2515.txt" || true
           done
 
-          echo "C200P_2515_CAPTURE=PASS" | tee fu_8-result.txt
+          find root14/usr/lib/lua/luci -printf '%y %P -> %l\n' 2>/dev/null | sort > ../results/fu_8-luci-tree-2514.txt || true
+          find root15/usr/lib/lua/luci -printf '%y %P -> %l\n' 2>/dev/null | sort > ../results/fu_8-luci-tree-2515.txt || true
+          sha256sum ../results/* > ../results/fu_8-results-sha256.txt
+          echo "C200P_2514_2515_ROOTFS_DIFF=PASS" > ../results/fu_8-result.txt
 
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: fu_8-C200P-R74-2.5.15-20260629-160214
-          path: fu_8-C200P-R74-2.5.15-20260629-160214
-          compression-level: 0
+          name: fu_8-C200P-R74-2.5.14-vs-2.5.15-rootfs-diff
+          path: fu_8-C200P-R74-2.5.14-vs-2.5.15-rootfs-diff/results
+          compression-level: 6
           include-hidden-files: true
