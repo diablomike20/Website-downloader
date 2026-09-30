@@ -1,0 +1,93 @@
+name: FU_7 P2 R91 Audit Summary
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-p2-r91-audit-summary.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  summarize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_ARTIFACT_ID: "11071941089"
+    steps:
+      - name: Extract compact evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p src out
+          curl -L --fail --retry 2             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             -H "X-GitHub-Api-Version: 2022-11-28"             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$SOURCE_ARTIFACT_ID/zip"             -o src/outer.zip
+          unzip -q src/outer.zip -d src/outer
+          cp src/outer/report/router-rootfs-diff.json out/ || true
+          cp src/outer/report/payload-identification.json out/ || true
+
+          nested="$(find src/outer -maxdepth 2 -type f -name 'fu_7-P2-R91-DEV-AUDIT.zip' | head -1)"
+          unzip -p "$nested" report/beta-only-interesting-strings.txt > out/beta-only-interesting-strings.txt || true
+          unzip -p "$nested" report/beta-only-strings.txt > out/beta-only-strings.txt || true
+          unzip -p "$nested" report/rootfs-keyword-hits.txt > out/rootfs-keyword-hits.txt || true
+          unzip -p "$nested" report/ui-route-hits.txt > out/ui-route-hits.txt || true
+          unzip -p "$nested" report/rootfs-interesting-files.txt > out/rootfs-interesting-files.txt || true
+
+          python3 - <<'PY'
+          import json, re, zipfile, os
+          d=json.load(open("out/router-rootfs-diff.json"))
+          print("STABLE_ROOTS",d.get("stable_roots"))
+          print("BETA_ROOTS",d.get("beta_roots"))
+          print("ONLY_BETA",len(d.get("only_beta",[])))
+          for x in d.get("only_beta",[]): print("  +",x)
+          print("ONLY_STABLE",len(d.get("only_stable",[])))
+          print("CHANGED",len(d.get("changed",[])))
+          # extract beta-only files from nested audit zip by suffix match
+          nested=next(p for p in os.listdir("src/outer") if p.endswith(".zip"))
+          zp="src/outer/"+nested
+          with zipfile.ZipFile(zp) as z:
+              names=z.namelist()
+              for rel in d.get("only_beta",[]):
+                  matches=[n for n in names if n.endswith("/"+rel) and "2.4.29b-20260422-101502" in n]
+                  for n in matches[:1]:
+                      data=z.read(n)
+                      safe=re.sub(r'[^A-Za-z0-9._-]+','_',rel)
+                      open("out/beta-only-file-"+safe,"wb").write(data)
+                      print("EXTRACTED_BETA_ONLY",rel,len(data),n)
+          PY
+
+          {
+            echo '===== ROOTFS DIFF ====='
+            cat out/router-rootfs-diff.json
+            echo
+            echo '===== BETA-ONLY INTERESTING STRINGS ====='
+            sed -n '1,1500p' out/beta-only-interesting-strings.txt
+            echo
+            echo '===== UI ROUTE HITS (developer/debug/diag filtered) ====='
+            grep -Ein 'developer|debug|factory|engineering|diagnostic|diag|packet|capture|pcap|terminal|shell|ssh|telnet|logread|feature|capabilit|hidden|test' out/ui-route-hits.txt | head -1500 || true
+            echo
+            echo '===== ROOTFS KEYWORD HITS (filtered) ====='
+            grep -Ein 'developer|debug|factory|engineering|diagnostic|diag|packet|capture|pcap|terminal|shell|ssh|telnet|logread|feature|capabilit|hidden|test' out/rootfs-keyword-hits.txt | head -2000 || true
+            echo
+            echo '===== BETA-ONLY FILE CONTENT/STRINGS ====='
+            for f in out/beta-only-file-*; do
+              [ -e "$f" ] || continue
+              echo "### $f"
+              file "$f" || true
+              if grep -Iq . "$f"; then sed -n '1,500p' "$f"; else strings -a -n 4 "$f" | head -800; fi
+            done
+          } > out/fu_7-P2-R91-DEV-SUMMARY.txt
+
+          cat out/fu_7-P2-R91-DEV-SUMMARY.txt
+          zip -qr fu_7-P2-R91-DEV-SUMMARY.zip out
+      - name: Upload compact summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-P2-R91-DEV-SUMMARY
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            fu_7-P2-R91-DEV-SUMMARY.zip
+            out/fu_7-P2-R91-DEV-SUMMARY.txt
+            out/router-rootfs-diff.json
+            out/beta-only-interesting-strings.txt
