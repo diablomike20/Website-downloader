@@ -1,0 +1,55 @@
+name: FU_7 P2 Controller Gate Trace
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-p2-controller-gate-trace.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  trace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_ARTIFACT_ID: "11071941089"
+    steps:
+      - name: Extract controller gate evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p src roots out
+          curl -L --fail --retry 2             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             -H "X-GitHub-Api-Version: 2022-11-28"             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$SOURCE_ARTIFACT_ID/zip"             -o src/outer.zip
+          unzip -q src/outer.zip -d src/outer
+          nested="$(find src/outer -maxdepth 2 -type f -name 'fu_7-P2-R91-DEV-AUDIT.zip' | head -1)"
+
+          unzip -Z1 "$nested" | grep -E 'report/rootfs/P2-R91-(2\.4\.22-20251204-184925|2\.4\.29b-20260422-101502)-sysupgrade\.bin__ubi__.*_vol-rootfs\.ubifs/' |             grep -E '/usr/lib/lua/luci/(controller/(system|diag|gcom)\.lua|apprpc/feature\.lua|model/cbi/system/(terminal|sandbox|preset|firstboot|upgrade|administration)\.lua|model/cbi/gcom/(atcmd|upgrade|magic|reset)\.lua|model/cbi/diag/[^/]+\.lua|description\.lua|gui\.lua)$'             > src/members.txt || true
+
+          while IFS= read -r member; do
+            unzip -q "$nested" "$member" -d roots || true
+          done < src/members.txt
+
+          {
+            echo '===== SELECTED FILES ====='
+            find roots -type f | sort
+            echo
+            for f in $(find roots -type f | sort); do
+              echo "===== FILE: $f ====="
+              strings -a -n 3 "$f" |                 grep -Ei 'rom_research|rom_release|research|release|entry|admin|system|network|gcom|diag|terminal|sandbox|preset|factory|developer|debug|atcmd|upgrade|magic|reset|hidden|feature|access|permission|acl|root|telnet|shell|command|cbi|template|call|alias|firstboot|backup|restore|generate'                 | head -500 || true
+              echo
+            done
+          } > out/fu_7-P2-CONTROLLER-GATE-TRACE.txt
+
+          cat out/fu_7-P2-CONTROLLER-GATE-TRACE.txt
+          zip -q fu_7-P2-CONTROLLER-GATE-TRACE.zip out/fu_7-P2-CONTROLLER-GATE-TRACE.txt
+      - name: Upload trace
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-P2-CONTROLLER-GATE-TRACE
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            fu_7-P2-CONTROLLER-GATE-TRACE.zip
+            out/fu_7-P2-CONTROLLER-GATE-TRACE.txt
