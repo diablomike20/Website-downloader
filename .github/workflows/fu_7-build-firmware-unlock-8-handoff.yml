@@ -1,0 +1,83 @@
+name: FU_7 Build Firmware Unlock 8 Handoff
+
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/fu_7-build-firmware-unlock-8-handoff.yml"
+      - "handoff/Firmware-Unlock-8/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: \${{ github.token }}
+
+    steps:
+      - name: Checkout handoff source
+        uses: actions/checkout@v4
+        with:
+          ref: fu_7-cudy-cdn-index
+
+      - name: Assemble self-contained handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          OUT="$GITHUB_WORKSPACE/out/fu_7-FIRMWARE-UNLOCK-8-HANDOFF-MASTER"
+          rm -rf "$GITHUB_WORKSPACE/out"
+          mkdir -p "$OUT/evidence-recent"
+
+          cp -a handoff/Firmware-Unlock-8/. "$OUT/"
+
+          gh run download 36654796857 \
+            -n fu_7-P2-HIDDEN-CONTROLS-AUDIT \
+            -D "$OUT/evidence-recent/fu_7-P2-HIDDEN-CONTROLS-AUDIT" || true
+
+          gh run download 36655021301 \
+            -n fu_7-P2-CONTROLLER-GATE-TRACE \
+            -D "$OUT/evidence-recent/fu_7-P2-CONTROLLER-GATE-TRACE" || true
+
+          gh run download 36655266074 \
+            -n fu_7-P2-EXACT-HIDDEN-TOOL-SEMANTICS \
+            -D "$OUT/evidence-recent/fu_7-P2-EXACT-HIDDEN-TOOL-SEMANTICS" || true
+
+          gh run download 36655358989 \
+            -n fu_7-P2-VISIBILITY-GATE-DISASM \
+            -D "$OUT/evidence-recent/fu_7-P2-VISIBILITY-GATE-DISASM" || true
+
+          (
+            cd "$OUT"
+            {
+              echo "fu_7-FIRMWARE-UNLOCK-8-HANDOFF-MASTER"
+              echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo
+              echo "Files:"
+              find . -type f ! -name SHA256SUMS.txt ! -name MANIFEST.txt -printf '%P\n' | LC_ALL=C sort
+            } > MANIFEST.txt
+
+            find . -type f ! -name SHA256SUMS.txt -print0 \
+              | LC_ALL=C sort -z \
+              | xargs -0 sha256sum > SHA256SUMS.txt
+          )
+
+          echo "=== Handoff inventory ==="
+          find "$OUT" -type f -printf '%P\t%s bytes\n' | LC_ALL=C sort
+          echo
+          echo "Files: $(find "$OUT" -type f | wc -l)"
+          echo "Bytes: $(du -sb "$OUT" | awk '{print $1}')"
+
+      - name: Upload Firmware Unlock 8 handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_7-FIRMWARE-UNLOCK-8-HANDOFF-MASTER
+          path: out/fu_7-FIRMWARE-UNLOCK-8-HANDOFF-MASTER/
+          retention-days: 30
+          compression-level: 9
+          if-no-files-found: error
