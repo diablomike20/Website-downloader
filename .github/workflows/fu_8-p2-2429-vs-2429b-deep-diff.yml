@@ -1,0 +1,153 @@
+name: fu_8 P2 2.4.29 stable vs 2.4.29b beta deep diff
+
+on:
+  push:
+    branches:
+      - fu_8-static-forensics
+    paths:
+      - ".github/workflows/fu_8-p2-2429-vs-2429b-deep-diff.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BETA_AUDIT_ARTIFACT_ID: "11071941089"
+    steps:
+      - name: Install extraction tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools unzip file python3-pip
+          python3 -m pip install --break-system-packages ubi-reader >/dev/null
+
+      - name: Recover beta rootfs and extract public stable 2.4.29
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="fu_8-P2-2429-VS-2429B-DEEP-DIFF-01"
+          mkdir -p "$OUT"/{src,rootfs,report,selected}
+
+          # Recover FU7 source-verified beta rootfs from the preserved Actions artifact.
+          curl -L --fail --retry 3 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$BETA_AUDIT_ARTIFACT_ID/zip" \
+            -o "$OUT/src/fu7-beta-audit-outer.zip"
+          unzip -q "$OUT/src/fu7-beta-audit-outer.zip" -d "$OUT/src/fu7-beta-audit"
+          NESTED="$(find "$OUT/src/fu7-beta-audit" -type f -name 'fu_7-P2-R91-DEV-AUDIT.zip' | head -n1)"
+          test -n "$NESTED"
+
+          BETA_PREFIX='report/rootfs/P2-R91-2.4.29b-20260422-101502-sysupgrade.bin__ubi__img-1774597814_vol-rootfs.ubifs'
+          unzip -q "$NESTED" "$BETA_PREFIX/*" -d "$OUT/src/beta-tree"
+          mv "$OUT/src/beta-tree/$BETA_PREFIX" "$OUT/rootfs/beta"
+
+          # Exact public filename is published by Cudy.
+          STABLE_URL="https://www.cudy.com/cdn/shop/files/P2-R91-2.4.29-20260421-190344-sysupgrade.zip"
+          curl -L --fail --retry 4 --retry-delay 2 -o "$OUT/src/stable.zip" "$STABLE_URL"
+          unzip -o "$OUT/src/stable.zip" -d "$OUT/src/stable-unzip" >/dev/null
+          STABLE_BIN="$(find "$OUT/src/stable-unzip" -type f -name '*.bin' | head -n1)"
+          test -n "$STABLE_BIN"
+
+          UBI_OFF="$(grep -aob -m1 'UBI#' "$STABLE_BIN" | cut -d: -f1)"
+          test -n "$UBI_OFF"
+          dd if="$STABLE_BIN" of="$OUT/src/stable.ubi" bs=1 skip="$UBI_OFF" status=none
+          mkdir -p "$OUT/src/stable-ubi"
+          ubireader_extract_images -o "$OUT/src/stable-ubi" "$OUT/src/stable.ubi" >"$OUT/report/stable-ubi-extract.log" 2>&1
+
+          STABLE_SQFS=""
+          while IFS= read -r f; do
+            magic="$(dd if="$f" bs=1 count=4 status=none 2>/dev/null || true)"
+            [ "$magic" = "hsqs" ] && { STABLE_SQFS="$f"; break; }
+          done < <(find "$OUT/src/stable-ubi" -type f)
+          test -n "$STABLE_SQFS"
+          unsquashfs -no-exit-code -d "$OUT/rootfs/stable" "$STABLE_SQFS" >"$OUT/report/stable-unsquashfs.log" 2>&1
+
+          {
+            echo "stable_url=$STABLE_URL"
+            echo "stable_zip_bytes=$(stat -c %s "$OUT/src/stable.zip")"
+            echo "stable_zip_sha256=$(sha256sum "$OUT/src/stable.zip" | awk '{print $1}')"
+            echo "stable_bin_name=$(basename "$STABLE_BIN")"
+            echo "stable_bin_bytes=$(stat -c %s "$STABLE_BIN")"
+            echo "stable_bin_sha256=$(sha256sum "$STABLE_BIN" | awk '{print $1}')"
+            echo "stable_ubi_offset=$UBI_OFF"
+            echo "stable_sqfs=$(basename "$STABLE_SQFS")"
+            echo "beta_source_artifact=$BETA_AUDIT_ARTIFACT_ID"
+          } > "$OUT/report/identity.txt"
+
+          cat > /tmp/fu8_p2diff.py <<'PY'
+          import csv, hashlib, os, stat, sys
+          from pathlib import Path
+          out=Path(sys.argv[1])
+          def tree(root):
+              root=Path(root); d={}
+              for p in sorted(root.rglob('*')):
+                  rel=str(p.relative_to(root))
+                  st=p.lstat()
+                  if p.is_symlink():
+                      d[rel]=('L',oct(stat.S_IMODE(st.st_mode)),os.readlink(p),'')
+                  elif p.is_file():
+                      h=hashlib.sha256()
+                      with p.open('rb') as f:
+                          for b in iter(lambda:f.read(1024*1024),b''): h.update(b)
+                      d[rel]=('F',oct(stat.S_IMODE(st.st_mode)),str(st.st_size),h.hexdigest())
+                  elif p.is_dir():
+                      d[rel]=('D',oct(stat.S_IMODE(st.st_mode)),'','')
+              return d
+          a=tree(out/'rootfs/stable'); b=tree(out/'rootfs/beta')
+          only_s=sorted(set(a)-set(b)); only_b=sorted(set(b)-set(a))
+          common=sorted(set(a)&set(b)); changed=[k for k in common if a[k]!=b[k]]
+          with (out/'report/tree-diff.csv').open('w',newline='') as f:
+              w=csv.writer(f); w.writerow(['status','path','stable_type','stable_mode','stable_size_or_target','stable_sha256','beta_type','beta_mode','beta_size_or_target','beta_sha256'])
+              for k in only_s:w.writerow(['ONLY_STABLE',k,*a[k],'','','',''])
+              for k in only_b:w.writerow(['ONLY_BETA',k,'','','','',*b[k]])
+              for k in changed:w.writerow(['CHANGED',k,*a[k],*b[k]])
+          with (out/'report/summary.txt').open('w') as f:
+              f.write(f'stable_entries={len(a)}\nbeta_entries={len(b)}\nonly_stable={len(only_s)}\nonly_beta={len(only_b)}\nchanged_common={len(changed)}\nidentical_common={len(common)-len(changed)}\n')
+          focus=('usr/lib/4g/','etc/hotplug.d/','etc/init.d/gcom','usr/bin/gcom','lib/network/','lib/netifd/')
+          with (out/'report/4g-focused-diff.txt').open('w') as f:
+              for status,seq in [('ONLY_STABLE',only_s),('ONLY_BETA',only_b),('CHANGED',changed)]:
+                  for k in seq:
+                      if k.startswith(focus) or k in focus:
+                          f.write(status+' '+k+'\n')
+          PY
+          python3 /tmp/fu8_p2diff.py "$OUT"
+
+          # Preserve exact 4G lifecycle source from both builds.
+          for tag in stable beta; do
+            root="$OUT/rootfs/$tag"
+            for p in usr/lib/4g etc/hotplug.d etc/init.d/gcom usr/bin/gcom; do
+              [ -e "$root/$p" ] || continue
+              mkdir -p "$OUT/selected/$tag/$(dirname "$p")"
+              cp -a "$root/$p" "$OUT/selected/$tag/$p"
+            done
+          done
+
+          {
+            echo "===== IDENTITY ====="; cat "$OUT/report/identity.txt"
+            echo "===== SUMMARY ====="; cat "$OUT/report/summary.txt"
+            echo "===== 4G FOCUSED DIFF ====="; cat "$OUT/report/4g-focused-diff.txt"
+            echo
+            for p in usr/lib/4g/4gup.sh usr/lib/4g/common.sh usr/lib/4g/quectel.sh usr/lib/4g/quectel2.sh usr/lib/4g/quectel-5g.sh usr/lib/4g/check.sh usr/lib/4g/reup.sh etc/hotplug.d/gcom/30-4g etc/hotplug.d/tty/30-4g; do
+              echo "===== DIFF $p ====="
+              diff -u "$OUT/rootfs/stable/$p" "$OUT/rootfs/beta/$p" 2>/dev/null || true
+            done
+            echo "===== GCOM STRING DELTA ====="
+            comm -3 <(strings "$OUT/rootfs/stable/usr/bin/gcom" | sort -u) <(strings "$OUT/rootfs/beta/usr/bin/gcom" | sort -u) || true
+          } > "$OUT/fu_8-P2-2429-VS-2429B-DEEP-DIFF-01.txt"
+
+          rm -rf "$OUT/rootfs" "$OUT/src"
+          (cd "$OUT" && find . -type f -print0 | sort -z | xargs -0 sha256sum > fu_8-SHA256SUMS.txt)
+
+      - name: Upload FU8 P2 deep diff
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_8-P2-2429-VS-2429B-DEEP-DIFF-01
+          path: fu_8-P2-2429-VS-2429B-DEEP-DIFF-01
+          compression-level: 0
+          include-hidden-files: true
