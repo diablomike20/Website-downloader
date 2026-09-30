@@ -1,0 +1,156 @@
+name: fu_8 P2 adjacent 2.4.29 vs 2.4.29b rootfs diff
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_8-p2-adjacent-rootfs-diff.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install extraction tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y squashfs-tools unzip file
+
+      - name: Download exact stable and archived exact beta
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          OUT="fu_8-P2-2.4.29-vs-2.4.29b-ADJACENT-DIFF"
+          mkdir -p "$OUT/work" "$OUT/results"
+          cd "$OUT/work"
+
+          STABLE_URL="https://www.cudy.com/cdn/shop/files/P2-R91-2.4.29-20260421-190344-sysupgrade.zip"
+          curl -L --fail --retry 3 -o stable.zip "$STABLE_URL"
+          echo "610a783202e1768156b5b9368de8a136565f4186f18bca88ea4c2144819658ab  stable.zip" | sha256sum -c -
+          unzip -q stable.zip -d stable-zip
+          STABLE=$(find stable-zip -type f -name 'P2-R91-2.4.29-20260421-190344-sysupgrade.bin' | head -1)
+          echo "33c9650709eb012348c0d7df31cb3d41ceefbf7d9ca8cebd0b22e0e0524a789c  $STABLE" | sha256sum -c -
+
+          ART_URL="https://api.github.com/repos/diablomike20/Website-downloader/actions/artifacts/11068611598/zip"
+          curl -L --fail --retry 3             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             -H "X-GitHub-Api-Version: 2022-11-28"             -o fu7-clean-master.zip "$ART_URL"
+          unzip -q fu7-clean-master.zip -d fu7-clean-master
+          BETA=$(find fu7-clean-master -type f -name 'P2-R91-2.4.29b-20260422-101502-sysupgrade.bin' | head -1)
+          test -n "$BETA"
+          echo "3f8dae3d42ad6ba7d1314022eac6bc007d03fac274196b2c802f2835ab21c3f9  $BETA" | sha256sum -c -
+
+          S_STABLE=$(grep -aob -m1 'hsqs' "$STABLE" | cut -d: -f1)
+          S_BETA=$(grep -aob -m1 'hsqs' "$BETA" | cut -d: -f1)
+          printf 'stable_squash_dec=%s\nstable_squash_hex=0x%X\nbeta_squash_dec=%s\nbeta_squash_hex=0x%X\n' "$S_STABLE" "$S_STABLE" "$S_BETA" "$S_BETA" > ../results/fu_8-image-layout.txt
+
+          dd if="$STABLE" of=stable.squashfs bs=1 skip="$S_STABLE" status=none
+          dd if="$BETA" of=beta.squashfs bs=1 skip="$S_BETA" status=none
+          unsquashfs -s stable.squashfs > ../results/fu_8-stable-squashfs-superblock.txt 2>&1
+          unsquashfs -s beta.squashfs > ../results/fu_8-beta-squashfs-superblock.txt 2>&1
+
+          mkdir stable-root beta-root
+          sudo unsquashfs -f -d "$PWD/stable-root" stable.squashfs > ../results/fu_8-stable-unsquashfs.log 2>&1
+          sudo unsquashfs -f -d "$PWD/beta-root" beta.squashfs > ../results/fu_8-beta-unsquashfs.log 2>&1
+          sudo chown -R "$(id -u):$(id -g)" stable-root beta-root ../results
+
+          python3 - <<'PY'
+          import os,stat,hashlib,csv,json
+          def scan(root):
+              out={}
+              for base,dirs,files in os.walk(root,topdown=True,followlinks=False):
+                  for n in dirs+files:
+                      p=os.path.join(base,n); rel=os.path.relpath(p,root)
+                      try: st=os.lstat(p)
+                      except FileNotFoundError: continue
+                      m=st.st_mode
+                      if stat.S_ISREG(m):
+                          typ='file'
+                          with open(p,'rb') as f: h=hashlib.sha256(f.read()).hexdigest()
+                          target=''
+                      elif stat.S_ISDIR(m): typ='dir';h='';target=''
+                      elif stat.S_ISLNK(m): typ='symlink';h='';target=os.readlink(p)
+                      elif stat.S_ISCHR(m): typ='char';h='';target=f'{os.major(st.st_rdev)}:{os.minor(st.st_rdev)}'
+                      elif stat.S_ISBLK(m): typ='block';h='';target=f'{os.major(st.st_rdev)}:{os.minor(st.st_rdev)}'
+                      elif stat.S_ISFIFO(m): typ='fifo';h='';target=''
+                      elif stat.S_ISSOCK(m): typ='socket';h='';target=''
+                      else: typ='other';h='';target=''
+                      out[rel]=(typ,oct(stat.S_IMODE(m)),st.st_uid,st.st_gid,st.st_size,h,target)
+              return out
+          A=scan('stable-root'); B=scan('beta-root')
+          counts={}
+          rows=[]
+          for p in sorted(set(A)|set(B)):
+              a=A.get(p); b=B.get(p)
+              if a is None: s='BETA_ONLY'
+              elif b is None: s='STABLE_ONLY'
+              elif a==b: s='UNCHANGED'
+              else: s='CHANGED_COMMON'
+              counts[s]=counts.get(s,0)+1
+              rows.append((p,s,a,b))
+          with open('../results/fu_8-rootfs-diff.csv','w',newline='') as f:
+              w=csv.writer(f); w.writerow(['path','status','stable_type','beta_type','stable_mode','beta_mode','stable_size','beta_size','stable_sha256','beta_sha256','stable_target','beta_target'])
+              for p,s,a,b in rows:
+                  aa=a or ('','','','','','',''); bb=b or ('','','','','','','')
+                  w.writerow([p,s,aa[0],bb[0],aa[1],bb[1],aa[4],bb[4],aa[5],bb[5],aa[6],bb[6]])
+          with open('../results/fu_8-rootfs-diff-summary.json','w') as f:
+              json.dump({'counts':counts,'stable_entries':len(A),'beta_entries':len(B)},f,indent=2,sort_keys=True)
+          with open('../results/fu_8-beta-only.txt','w') as f:
+              for p,s,a,b in rows:
+                  if s=='BETA_ONLY': f.write(p+'\n')
+          with open('../results/fu_8-stable-only.txt','w') as f:
+              for p,s,a,b in rows:
+                  if s=='STABLE_ONLY': f.write(p+'\n')
+          with open('../results/fu_8-changed-common.txt','w') as f:
+              for p,s,a,b in rows:
+                  if s=='CHANGED_COMMON': f.write(p+'\n')
+          focus_prefix=('etc/hotplug.d/','usr/lib/4g/','usr/lib/lua/luci/','etc/config/','etc/init.d/','usr/bin/','usr/sbin/')
+          with open('../results/fu_8-cellular-focused-delta.txt','w') as f:
+              for p,s,a,b in rows:
+                  if s!='UNCHANGED' and p.startswith(focus_prefix):
+                      f.write(f'{s}\t{p}\n')
+          PY
+
+          for p in             etc/hotplug.d/gcom/30-4g             etc/hotplug.d/tty/30-4g             etc/rom_research             usr/lib/4g/check.sh             usr/lib/4g/reup.sh; do
+            {
+              echo "===== $p ====="
+              if [ -e "stable-root/$p" ] || [ -L "stable-root/$p" ]; then
+                echo "--- STABLE ---"
+                stat -c 'mode=%a size=%s uid=%u gid=%g' "stable-root/$p" 2>/dev/null || true
+                sha256sum "stable-root/$p" 2>/dev/null || true
+                sed -n '1,260p' "stable-root/$p" 2>/dev/null || true
+              else echo "STABLE_ABSENT"; fi
+              if [ -e "beta-root/$p" ] || [ -L "beta-root/$p" ]; then
+                echo "--- BETA ---"
+                stat -c 'mode=%a size=%s uid=%u gid=%g' "beta-root/$p" 2>/dev/null || true
+                sha256sum "beta-root/$p" 2>/dev/null || true
+                sed -n '1,260p' "beta-root/$p" 2>/dev/null || true
+              else echo "BETA_ABSENT"; fi
+              echo
+            } >> ../results/fu_8-five-files-exact-content.txt
+          done
+
+          # exact 4G tree manifests
+          find stable-root/usr/lib/4g -type f -print0 2>/dev/null | sort -z | xargs -0 -r sha256sum | sed 's#  stable-root/#  /#' > ../results/fu_8-stable-4g-sha256.txt
+          find beta-root/usr/lib/4g -type f -print0 2>/dev/null | sort -z | xargs -0 -r sha256sum | sed 's#  beta-root/#  /#' > ../results/fu_8-beta-4g-sha256.txt
+          find stable-root/etc/hotplug.d -type f -print0 2>/dev/null | sort -z | xargs -0 -r sha256sum | sed 's#  stable-root/#  /#' > ../results/fu_8-stable-hotplug-sha256.txt
+          find beta-root/etc/hotplug.d -type f -print0 2>/dev/null | sort -z | xargs -0 -r sha256sum | sed 's#  beta-root/#  /#' > ../results/fu_8-beta-hotplug-sha256.txt
+
+          # fwtool metadata strings
+          tail -c 4096 "$STABLE" | strings -a -n 8 > ../results/fu_8-stable-tail-strings.txt
+          tail -c 4096 "$BETA" | strings -a -n 8 > ../results/fu_8-beta-tail-strings.txt
+          sha256sum ../results/* > ../results/fu_8-results-sha256.txt
+          echo "P2_ADJACENT_ROOTFS_DIFF=PASS" > ../results/fu_8-result.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fu_8-P2-2.4.29-vs-2.4.29b-ADJACENT-DIFF
+          path: fu_8-P2-2.4.29-vs-2.4.29b-ADJACENT-DIFF/results
+          compression-level: 6
+          include-hidden-files: true
