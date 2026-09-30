@@ -1,0 +1,105 @@
+name: fu_8 P2 public 2.4.22 to 2.4.29 backend ownership diff
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_8-p2-public-backend-delta.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools unzip file python3-pip lua5.1 >/dev/null
+          python3 -m pip install --break-system-packages ubi-reader >/dev/null
+
+      - name: Extract and inspect backend ownership delta
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          OUT="fu_8-P2-2.4.22-vs-2.4.29-BACKEND-OWNERSHIP"
+          mkdir -p "$OUT/work" "$OUT/results"
+          cd "$OUT/work"
+
+          curl -L --fail --retry 3 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" \
+            -o fu7.zip "https://api.github.com/repos/diablomike20/Website-downloader/actions/artifacts/11068611598/zip"
+          unzip -q fu7.zip -d fu7
+          OLD=$(find fu7 -type f -name 'P2-R91-2.4.22-20251204-184925-sysupgrade.bin' | head -1)
+          echo "592c494eb5f44beabb427907003801845ea0d47d51db50b1d5b97d40e3166b58  $OLD" | sha256sum -c -
+
+          curl -L --fail --retry 3 -o new.zip "https://www.cudy.com/cdn/shop/files/P2-R91-2.4.29-20260421-190344-sysupgrade.zip"
+          echo "610a783202e1768156b5b9368de8a136565f4186f18bca88ea4c2144819658ab  new.zip" | sha256sum -c -
+          unzip -q new.zip -d newzip
+          NEW=$(find newzip -type f -name 'P2-R91-2.4.29-20260421-190344-sysupgrade.bin' | head -1)
+          echo "33c9650709eb012348c0d7df31cb3d41ceefbf7d9ca8cebd0b22e0e0524a789c  $NEW" | sha256sum -c -
+
+          for side in old new; do
+            [ "$side" = old ] && BIN="$OLD" || BIN="$NEW"
+            U=$(grep -aob 'UBI#' "$BIN" | cut -d: -f1 | head -1)
+            tail -c "+$((U+1))" "$BIN" > "$side.ubi"
+            mkdir "$side-vols"
+            ubireader_extract_images -o "$side-vols" "$side.ubi" >/dev/null 2>&1
+            ROOTVOL=""
+            while IFS= read -r v; do [ "$(head -c4 "$v" 2>/dev/null || true)" = "hsqs" ] && { ROOTVOL="$v"; break; }; done < <(find "$side-vols" -type f | sort)
+            test -n "$ROOTVOL"
+            mkdir "$side-root"
+            sudo unsquashfs -no-exit-code -d "$PWD/$side-root" "$ROOTVOL" >/dev/null 2>&1
+          done
+          sudo chown -R "$(id -u):$(id -g)" old-root new-root
+
+          PATHS="usr/bin/gcom usr/lib/lua/luci/controller/gcom.lua usr/lib/lua/luci/apprpc/cellular.lua"
+          for p in $PATHS; do
+            safe=$(echo "$p" | tr '/' '_')
+            {
+              echo "===== $p ====="
+              echo "--- OLD ---"; file "old-root/$p" || true; sha256sum "old-root/$p" || true; stat -c 'size=%s mode=%a' "old-root/$p" || true
+              echo "--- NEW ---"; file "new-root/$p" || true; sha256sum "new-root/$p" || true; stat -c 'size=%s mode=%a' "new-root/$p" || true
+            } > "../results/fu_8-$safe-meta.txt"
+            strings -a -n 4 "old-root/$p" | sort -u > "../results/fu_8-$safe-old-strings.txt" || true
+            strings -a -n 4 "new-root/$p" | sort -u > "../results/fu_8-$safe-new-strings.txt" || true
+            comm -23 "../results/fu_8-$safe-old-strings.txt" "../results/fu_8-$safe-new-strings.txt" > "../results/fu_8-$safe-old-only-strings.txt" || true
+            comm -13 "../results/fu_8-$safe-old-strings.txt" "../results/fu_8-$safe-new-strings.txt" > "../results/fu_8-$safe-new-only-strings.txt" || true
+            if file "old-root/$p" | grep -qi 'Lua bytecode'; then luac5.1 -l -l "old-root/$p" > "../results/fu_8-$safe-old-luac.txt" 2>&1 || true; fi
+            if file "new-root/$p" | grep -qi 'Lua bytecode'; then luac5.1 -l -l "new-root/$p" > "../results/fu_8-$safe-new-luac.txt" 2>&1 || true; fi
+          done
+
+          # Search exact new ownership/action strings in the new tree and old tree.
+          for side in old new; do
+            grep -RIanE 'network\.gcom|add_device|del_device|reup|QNETDEVSTATUS|NDISSTAT|exec_reup_4g|check\.sh|reup\.sh' "$side-root" 2>/dev/null \
+              | sed "s#^$side-root/##" > "../results/fu_8-$side-ownership-hits.txt" || true
+          done
+
+          # Binary-level byte difference statistics for gcom.
+          python3 - <<'PY'
+          import hashlib
+          A=open('old-root/usr/bin/gcom','rb').read(); B=open('new-root/usr/bin/gcom','rb').read()
+          n=min(len(A),len(B)); dif=[i for i in range(n) if A[i]!=B[i]]
+          with open('../results/fu_8-gcom-byte-diff-summary.txt','w') as f:
+              f.write(f'old_size={len(A)} new_size={len(B)} common_prefix_compared={n}\n')
+              f.write(f'differing_positions_in_common_range={len(dif)}\n')
+              f.write(f'old_sha256={hashlib.sha256(A).hexdigest()}\nnew_sha256={hashlib.sha256(B).hexdigest()}\n')
+              if dif:
+                  f.write(f'first_diff={dif[0]} last_diff={dif[-1]}\n')
+          PY
+
+          echo "P2_PUBLIC_BACKEND_OWNERSHIP_DIFF=PASS" > ../results/fu_8-result.txt
+          find ../results -type f -print0 | sort -z | xargs -0 sha256sum > ../results/fu_8-results-sha256.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fu_8-P2-2.4.22-vs-2.4.29-BACKEND-OWNERSHIP
+          path: fu_8-P2-2.4.22-vs-2.4.29-BACKEND-OWNERSHIP/results
+          compression-level: 6
