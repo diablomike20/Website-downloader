@@ -1,0 +1,101 @@
+name: fu_8 R25 hcshd auth and key correlation
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_8-r25-hcshd-auth-key.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools qemu-user python3 openssl >/dev/null
+
+      - name: Compare keys and exercise invalid auth only
+        shell: bash
+        run: |
+          set -euxo pipefail
+          OUT="fu_8-R25-HCSHD-AUTH-KEY"
+          mkdir -p "$OUT/results" "$OUT/work"
+          cd "$OUT/work"
+
+          curl -L --fail --retry 3 -o stock.bin "https://d1jvyy13vm72kv.cloudfront.net/device/upgrade/upgrade_LT500V2-R25-2.4.16-20250804-150319-flash_20729.bin"
+          echo "57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6  stock.bin" | sha256sum -c -
+          tail -c "+2784590" stock.bin > rootfs.squashfs
+          sudo unsquashfs -no-exit-code -d "$PWD/root" rootfs.squashfs >/dev/null 2>&1
+          sudo chown -R "$(id -u):$(id -g)" root
+
+          test -f root/usr/sbin/hcshd
+          test -f root/usr/lib/libbdinfo.so
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,hashlib,json
+          out=Path('../results')
+          paths={'hcshd':Path('root/usr/sbin/hcshd'),'libbdinfo':Path('root/usr/lib/libbdinfo.so')}
+          result={}
+          for name,p in paths.items():
+              d=p.read_bytes()
+              blocks=re.findall(br'-----BEGIN RSA PUBLIC KEY-----.*?-----END RSA PUBLIC KEY-----',d,re.S)
+              result[name]=[]
+              for i,b in enumerate(blocks):
+                  b=b+b'\n'
+                  fn=out/f'fu_8-{name}-rsa-public-{i}.pem'
+                  fn.write_bytes(b)
+                  result[name].append({'index':i,'sha256':hashlib.sha256(b).hexdigest(),'size':len(b)})
+          hs={x['sha256'] for x in result['hcshd']}
+          ls={x['sha256'] for x in result['libbdinfo']}
+          result['shared_pem_sha256']=sorted(hs & ls)
+          result['exact_shared_pem']=bool(hs & ls)
+          (out/'fu_8-rsa-key-correlation.json').write_text(json.dumps(result,indent=2,sort_keys=True))
+          PY
+
+          for p in ../results/*.pem; do
+            [ -f "$p" ] || continue
+            openssl rsa -RSAPublicKey_in -in "$p" -pubout -outform DER 2>/dev/null | sha256sum >> ../results/fu_8-rsa-der-sha256.txt || true
+            openssl rsa -RSAPublicKey_in -in "$p" -text -noout >> ../results/fu_8-rsa-key-details.txt 2>&1 || true
+          done
+
+          # Isolated negative auth test only: 128 zero bytes, never a valid signed command.
+          set +e
+          qemu-mipsel -strace -L "$PWD/root" root/usr/sbin/hcshd > ../results/fu_8-invalid-auth-daemon-stdout.txt 2> ../results/fu_8-invalid-auth-daemon-stderr.txt &
+          QPID=$!
+          sleep 1
+          python3 - <<'PY'
+          import socket
+          s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+          s.settimeout(1)
+          s.sendto(b'\x00'*128,('127.0.0.1',56791))
+          try:
+              data,_=s.recvfrom(4096)
+              open('../results/fu_8-invalid-auth-udp-reply.bin','wb').write(data)
+              open('../results/fu_8-invalid-auth-client.txt','w').write('reply_len=%d\n'%len(data))
+          except Exception as e:
+              open('../results/fu_8-invalid-auth-client.txt','w').write('no_reply=%s\n'%type(e).__name__)
+          PY
+          sleep 1
+          kill "$QPID" 2>/dev/null || true
+          wait "$QPID" 2>/dev/null || true
+          set -e
+
+          grep -aE 'RSA decrypt error|Read RSA public key error|RSA public key size error|recvfrom|sendto|system|popen'             ../results/fu_8-invalid-auth-daemon-stderr.txt > ../results/fu_8-invalid-auth-focused.txt || true
+
+          echo "R25_HCSHD_AUTH_KEY_AUDIT=PASS" > ../results/fu_8-result.txt
+          find ../results -type f -print0 | sort -z | xargs -0 sha256sum > ../results/fu_8-results-sha256.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fu_8-R25-HCSHD-AUTH-KEY
+          path: fu_8-R25-HCSHD-AUTH-KEY/results
+          compression-level: 6
