@@ -20,7 +20,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y -qq squashfs-tools file binutils-mipsel-linux-gnu binutils python3 >/dev/null
+          sudo apt-get install -y -qq squashfs-tools file binutils-mipsel-linux-gnu binutils python3 qemu-user iproute2 >/dev/null
 
       - name: Download exact stock R25 and extract caller topology
         shell: bash
@@ -121,6 +121,19 @@ jobs:
           readelf -sW "$H" > ../results/fu_8-hcshd-readelf-symbols.txt || true
           readelf -rW "$H" > ../results/fu_8-hcshd-readelf-relocs.txt || true
           mipsel-linux-gnu-objdump -D "$H" > ../results/fu_8-hcshd-objdump.txt || true
+          cp "$H" ../results/fu_8-hcshd.bin
+          cp root/usr/sbin/cmagent ../results/fu_8-cmagent.bin
+          cp root/usr/lib/lua/cmagent/router/command.lua ../results/fu_8-cmagent-router-command.lua
+          cp root/usr/lib/lua/luci/apprpc/mesh.lua ../results/fu_8-luci-apprpc-mesh.lua
+
+          # Observe only startup socket syscalls in an isolated runner. No packet is sent.
+          (
+            set +e
+            timeout 3s qemu-mipsel -strace -L "$PWD/root" "$H" > ../results/fu_8-hcshd-qemu-stdout.txt 2> ../results/fu_8-hcshd-qemu-strace.txt
+            echo "qemu_exit=$?" > ../results/fu_8-hcshd-qemu-exit.txt
+            ss -ulnp > ../results/fu_8-runner-udp-after-timeout.txt 2>&1 || true
+            set -e
+          )
 
           # Extract public key text from hcshd without touching any private material.
           python3 - <<'PY'
