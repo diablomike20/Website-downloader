@@ -1,0 +1,82 @@
+name: fu_8 R25 RSA trust anchor inventory
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_8-r25-rsa-trust-map.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install extractor
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools python3 >/dev/null
+      - name: Map embedded public keys
+        shell: bash
+        run: |
+          set -euxo pipefail
+          OUT="fu_8-R25-RSA-TRUST-MAP"
+          mkdir -p "$OUT/results" "$OUT/work"
+          cd "$OUT/work"
+          curl -L --fail --retry 3 -o stock.bin "https://d1jvyy13vm72kv.cloudfront.net/device/upgrade/upgrade_LT500V2-R25-2.4.16-20250804-150319-flash_20729.bin"
+          echo "57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6  stock.bin" | sha256sum -c -
+          tail -c "+2784590" stock.bin > rootfs.squashfs
+          sudo unsquashfs -no-exit-code -d "$PWD/root" rootfs.squashfs >/dev/null 2>&1
+          sudo chown -R "$(id -u):$(id -g)" root
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,hashlib,csv,json
+          R=Path('root'); rows=[]
+          pats=[
+            ('RSA_PUBLIC_KEY',re.compile(br'-----BEGIN RSA PUBLIC KEY-----.*?-----END RSA PUBLIC KEY-----',re.S)),
+            ('PUBLIC_KEY',re.compile(br'-----BEGIN PUBLIC KEY-----.*?-----END PUBLIC KEY-----',re.S)),
+          ]
+          for p in R.rglob('*'):
+              if not p.is_file(): continue
+              try:d=p.read_bytes()
+              except:continue
+              for kind,rx in pats:
+                  for i,m in enumerate(rx.findall(d)):
+                      block=m+b'\n'
+                      rows.append({
+                        'path':str(p.relative_to(R)),'kind':kind,'index':i,
+                        'pem_sha256':hashlib.sha256(block).hexdigest(),
+                        'pem_size':len(block)
+                      })
+          with open('../results/fu_8-rsa-key-map.csv','w',newline='') as f:
+              w=csv.DictWriter(f,fieldnames=['path','kind','index','pem_sha256','pem_size']);w.writeheader();w.writerows(rows)
+          groups={}
+          for x in rows: groups.setdefault(x['pem_sha256'],[]).append(x['path'])
+          Path('../results/fu_8-rsa-key-groups.json').write_text(json.dumps(groups,indent=2,sort_keys=True))
+          Path('../results/fu_8-rsa-summary.txt').write_text(
+            f'embedded_public_key_blocks={len(rows)}\nunique_pem_sha256={len(groups)}\n'
+          )
+          PY
+
+          for p in sbin/oem-check usr/bin/bdinfo usr/lib/libbdinfo.so usr/sbin/hcshd usr/sbin/cmagent usr/sbin/cmsd; do
+            if [ -f "root/$p" ]; then
+              echo "===== $p =====" >> ../results/fu_8-focused-binary-key-strings.txt
+              sha256sum "root/$p" >> ../results/fu_8-focused-binary-key-strings.txt
+              strings -a "root/$p" | grep -E 'BEGIN (RSA )?PUBLIC KEY|END (RSA )?PUBLIC KEY|RSA_public|PEM_read|oem|signature|verify' >> ../results/fu_8-focused-binary-key-strings.txt || true
+            fi
+          done
+
+          echo "R25_RSA_TRUST_MAP=PASS" > ../results/fu_8-result.txt
+          find ../results -type f -print0 | sort -z | xargs -0 sha256sum > ../results/fu_8-results-sha256.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fu_8-R25-RSA-TRUST-MAP
+          path: fu_8-R25-RSA-TRUST-MAP/results
+          compression-level: 6
