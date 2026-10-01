@@ -1,0 +1,89 @@
+name: fu_8 R25 cmagent auth static RE
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_8-r25-cmagent-auth-static.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools binutils-mipsel-linux-gnu file python3 >/dev/null
+
+      - name: Extract exact stock cmagent and map auth boundary
+        shell: bash
+        run: |
+          set -euxo pipefail
+          OUT="fu_8-R25-CMAGENT-AUTH-STATIC"
+          mkdir -p "$OUT/results" "$OUT/work"
+          cd "$OUT/work"
+
+          curl -L --fail --retry 3 -o stock.bin "https://d1jvyy13vm72kv.cloudfront.net/device/upgrade/upgrade_LT500V2-R25-2.4.16-20250804-150319-flash_20729.bin"
+          echo "57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6  stock.bin" | sha256sum -c -
+          tail -c "+2784590" stock.bin > rootfs.squashfs
+          sudo unsquashfs -no-exit-code -d "$PWD/root" rootfs.squashfs >/dev/null 2>&1
+          sudo chown -R "$(id -u):$(id -g)" root
+
+          BIN=root/usr/sbin/cmagent
+          test -f "$BIN"
+          sha256sum "$BIN" > ../results/fu_8-cmagent-sha256.txt
+          file "$BIN" > ../results/fu_8-cmagent-file.txt
+          mipsel-linux-gnu-readelf -h "$BIN" > ../results/fu_8-cmagent-readelf-header.txt
+          mipsel-linux-gnu-readelf -d "$BIN" > ../results/fu_8-cmagent-readelf-dynamic.txt
+          mipsel-linux-gnu-readelf -r "$BIN" > ../results/fu_8-cmagent-readelf-relocs.txt
+          mipsel-linux-gnu-readelf -Ws "$BIN" > ../results/fu_8-cmagent-readelf-symbols.txt
+          mipsel-linux-gnu-objdump -d -M no-aliases "$BIN" > ../results/fu_8-cmagent-disassembly.txt
+
+          # Only security/transport-relevant symbolic strings; deliberately exclude credential-like values.
+          strings -a -n 4 "$BIN" | grep -Ei             'jwt_|mqtt|mosquitto|crypt|aes|admin|topic|service_call|/usr/lib/lua/cmagent|ubus|peer|client|timeout|auth|verify|sign|pem| -a:| -j:'             | grep -Evi 'password|passwd|secret|token|CLOUDmqtt|private key'             | sort -u > ../results/fu_8-cmagent-security-transport-strings.txt || true
+
+          cp root/etc/init.d/cmagent ../results/fu_8-source-etc_init.d_cmagent.txt
+          cp root/etc/config/cmagent ../results/fu_8-source-etc_config_cmagent.txt
+          cp root/etc/config/cmsd ../results/fu_8-source-etc_config_cmsd.txt
+
+          python3 - <<'PY'
+          from pathlib import Path
+          init=Path('root/etc/init.d/cmagent').read_text(errors='replace')
+          cfg=Path('root/etc/config/cmagent').read_text(errors='replace')
+          cms=Path('root/etc/config/cmsd').read_text(errors='replace')
+          s=Path('../results/fu_8-cmagent-security-transport-strings.txt').read_text(errors='replace')
+          facts=[]
+          facts.append(('stock_init_admin_flag', '[ "$admin" -eq 1 ] && procd_append_param command -a' in init))
+          facts.append(('stock_init_jwt_flag', 'procd_append_param command -j' in init))
+          facts.append(('stock_broker_loopback', "option broker '127.0.0.1'" in cfg))
+          facts.append(('stock_cmsd_disabled', "option enabled '0'" in cms))
+          facts.append(('binary_has_jwt_verify', 'jwt_verify_' in s))
+          facts.append(('binary_has_jwt_sign', 'jwt_sign_' in s))
+          facts.append(('binary_has_mqtt', 'mqtt' in s.lower() or 'mosquitto' in s.lower()))
+          facts.append(('binary_has_service_call', 'service_call' in s))
+          with open('../results/fu_8-cmagent-runtime-auth-facts.csv','w') as f:
+              f.write('fact,value\n')
+              for k,v in facts: f.write(f'{k},{str(v).upper()}\n')
+          with open('../results/fu_8-cmagent-auth-boundary-summary.txt','w') as f:
+              f.write('STOCK_RUNTIME_JWT_PLUGIN=NOT_ENABLED_BY_INIT\n' if not facts[1][1] else 'STOCK_RUNTIME_JWT_PLUGIN=ENABLED_BY_INIT\n')
+              f.write('STOCK_RUNTIME_ADMIN_MODE=ENABLED_BY_CONFIG_AND_INIT\n' if facts[0][1] else 'STOCK_RUNTIME_ADMIN_MODE=NOT_PROVEN\n')
+              f.write('STOCK_BROKER=LOOPBACK\n' if facts[2][1] else 'STOCK_BROKER=OTHER_OR_UNKNOWN\n')
+              f.write('JWT_CAPABILITY_IN_BINARY=YES\n' if facts[4][1] else 'JWT_CAPABILITY_IN_BINARY=NO_OR_NOT_FOUND\n')
+              f.write('INTERPRETATION=JWT symbols prove capability, not the default R25 runtime auth path. Exact admin-mode peer authorization remains binary control-flow RE required.\n')
+          PY
+
+          echo "R25_CMAGENT_AUTH_STATIC_RE=PASS" > ../results/fu_8-result.txt
+          find ../results -type f -print0 | sort -z | xargs -0 sha256sum > ../results/fu_8-results-sha256.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fu_8-R25-CMAGENT-AUTH-STATIC
+          path: fu_8-R25-CMAGENT-AUTH-STATIC/results
+          compression-level: 6
