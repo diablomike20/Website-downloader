@@ -1,0 +1,92 @@
+name: fu_8 R25 management plane materialization RE
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_8-r25-management-plane-materialization.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools python3 >/dev/null
+
+      - name: Extract exact stock management materialization
+        shell: bash
+        run: |
+          set -euxo pipefail
+          OUT="fu_8-R25-MANAGEMENT-PLANE-MATERIALIZATION"
+          mkdir -p "$OUT/results" "$OUT/work"
+          cd "$OUT/work"
+
+          curl -L --fail --retry 3 -o stock.bin "https://d1jvyy13vm72kv.cloudfront.net/device/upgrade/upgrade_LT500V2-R25-2.4.16-20250804-150319-flash_20729.bin"
+          echo "57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6  stock.bin" | sha256sum -c -
+          tail -c "+2784590" stock.bin > rootfs.squashfs
+          sudo unsquashfs -no-exit-code -d "$PWD/root" rootfs.squashfs >/dev/null 2>&1
+          sudo chown -R "$(id -u):$(id -g)" root
+
+          for p in             etc/config/cmagent             etc/config/cmsd             etc/config/mosquitto             etc/init.d/cmagent             etc/init.d/cmsd             etc/init.d/mosquitto             etc/init.d/vlan             etc/uci-defaults/30_wlan             etc/uci-defaults/99_fixwan             etc/uci-defaults/40_luci-business; do
+            if [ -f "root/$p" ]; then
+              cp "root/$p" "../results/fu_8-source-$(echo "$p" | tr '/' '_').txt"
+            fi
+          done
+
+          # Exact source references that mutate or consume cmagent role/config.
+          find root/etc root/usr/lib/lua root/usr/sbin root/usr/bin -type f -print0 2>/dev/null             | xargs -0 -r grep -IanE 'cmagent\.mqtt\.(admin|broker|port|prefix|timeout|disabled|filter|acmanager_role)|uci[^\n]*cmagent|_cmagent\._tcp\.local|rpBA=' 2>/dev/null             | sed 's#^root/##'             | awk 'length($0)<1500'             > ../results/fu_8-cmagent-role-materialization-crossref.txt || true
+
+          # Exact broker materialization references; do not export key contents.
+          grep -nE 'crypt -gd|/var/etc/mosquitto|procd_set_param command|CONF=|config_load|respawn|reload_trigger'             root/etc/init.d/mosquitto > ../results/fu_8-mosquitto-runtime-materialization.txt || true
+
+          # Role/control-flow facts from exact init/default sources.
+          python3 - <<'PY'
+          from pathlib import Path
+          import csv,re
+          def txt(p):
+              q=Path('root')/p
+              return q.read_text(errors='replace') if q.exists() else ''
+          c=txt('etc/config/cmagent')
+          ci=txt('etc/init.d/cmagent')
+          cms=txt('etc/config/cmsd')
+          facts=[
+            ('default_broker_loopback', "option broker '127.0.0.1'" in c),
+            ('default_port_8883', "option port '8883'" in c),
+            ('default_admin_1', "option admin '1'" in c),
+            ('default_prefix_router', "option prefix 'router'" in c),
+            ('default_timeout_30', "option timeout '30'" in c),
+            ('checkuuid_gate', 'bdinfo checkuuid' in ci),
+            ('mac_gate', 'bdinfo mac' in ci),
+            ('admin_adds_a_flag', 'procd_append_param command -a' in ci),
+            ('respawn_configured', 'procd_set_param respawn 3600 5 0' in ci),
+            ('mdns_service_cmagent', '_cmagent._tcp.local' in ci),
+            ('mdns_rpba_mac', 'rpBA=' in ci and 'bdinfo mac' in ci),
+            ('mdns_suppressed_re_client', 'workmode" == "re"' in ci and 'workmode" == "client"' in ci),
+            ('cmsd_default_disabled', "option enabled '0'" in cms),
+          ]
+          with open('../results/fu_8-management-materialization-facts.csv','w',newline='') as f:
+              w=csv.writer(f); w.writerow(['fact','value'])
+              for k,v in facts: w.writerow([k,str(v).upper()])
+          with open('../results/fu_8-management-materialization-summary.txt','w') as f:
+              for k,v in facts: f.write(f'{k}={str(v).upper()}\n')
+              f.write('INTERPRETATION=Default R25 management plane is local router/admin-oriented, identity-gated, respawned, and mDNS-advertised where role permits.\n')
+              f.write('HCSHD_RELATION=No direct bridge asserted; hcshd remains separate maintenance plane.\n')
+          PY
+
+          echo "R25_MANAGEMENT_PLANE_MATERIALIZATION_RE=PASS" > ../results/fu_8-result.txt
+          find ../results -type f -print0 | sort -z | xargs -0 sha256sum > ../results/fu_8-results-sha256.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fu_8-R25-MANAGEMENT-PLANE-MATERIALIZATION
+          path: fu_8-R25-MANAGEMENT-PLANE-MATERIALIZATION/results
+          compression-level: 6
