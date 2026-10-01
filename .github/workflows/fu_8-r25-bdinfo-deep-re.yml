@@ -1,0 +1,73 @@
+name: fu_8 R25 bdinfo deep static RE
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_8-r25-bdinfo-deep-re.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  re:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools binutils-mipsel-linux-gnu file >/dev/null
+
+      - name: Extract exact bdinfo binaries and static metadata
+        shell: bash
+        run: |
+          set -euxo pipefail
+          OUT="fu_8-R25-BDINFO-DEEP-RE"
+          mkdir -p "$OUT/results" "$OUT/work"
+          cd "$OUT/work"
+
+          curl -L --fail --retry 3 -o stock.bin "https://d1jvyy13vm72kv.cloudfront.net/device/upgrade/upgrade_LT500V2-R25-2.4.16-20250804-150319-flash_20729.bin"
+          echo "57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6  stock.bin" | sha256sum -c -
+          tail -c "+2784590" stock.bin > rootfs.squashfs
+          sudo unsquashfs -no-exit-code -d "$PWD/root" rootfs.squashfs >/dev/null 2>&1
+          sudo chown -R "$(id -u):$(id -g)" root
+
+          LIB=root/usr/lib/libbdinfo.so
+          CLI=root/usr/bin/bdinfo
+          test -f "$LIB"
+          test -f "$CLI"
+          cp "$LIB" ../results/fu_8-libbdinfo.so
+          cp "$CLI" ../results/fu_8-bdinfo
+          sha256sum "$LIB" "$CLI" > ../results/fu_8-bdinfo-binary-sha256.txt
+          file "$LIB" "$CLI" > ../results/fu_8-bdinfo-filetypes.txt
+
+          for pair in "libbdinfo:$LIB" "bdinfo:$CLI"; do
+            n=${pair%%:*}; p=${pair#*:}
+            readelf -hW "$p" > "../results/fu_8-$n-readelf-header.txt" || true
+            readelf -lW "$p" > "../results/fu_8-$n-readelf-programheaders.txt" || true
+            readelf -SW "$p" > "../results/fu_8-$n-readelf-sections.txt" || true
+            readelf -sW "$p" > "../results/fu_8-$n-readelf-symbols.txt" || true
+            readelf -rW "$p" > "../results/fu_8-$n-readelf-relocs.txt" || true
+            readelf -dW "$p" > "../results/fu_8-$n-readelf-dynamic.txt" || true
+            strings -a -t x "$p" > "../results/fu_8-$n-strings-offsets.txt"
+            mipsel-linux-gnu-objdump -D -EL "$p" > "../results/fu_8-$n-objdump.txt" 2>&1 || true
+          done
+
+          grep -aE 'bdinfo_check_uuid|checkuuid|flash_uuid|fuuid|hmac|SHA256|@2025|rom_dbg|rom_release|signature|RSA|md5|check_dbg'             ../results/fu_8-libbdinfo-strings-offsets.txt > ../results/fu_8-libbdinfo-focused-strings.txt || true
+          grep -aE 'checkuuid|check|dbg|md5|factory|fuuid|hmac|signature'             ../results/fu_8-bdinfo-strings-offsets.txt > ../results/fu_8-bdinfo-cli-focused-strings.txt || true
+
+          # Symbol-centered disassembly excerpts when symbol names are retained.
+          grep -n -E '<(bdinfo_check_uuid|bdinfo_check_dbg|bdinfo_check_md5|bdinfo_signature|bdinfo_read|bdinfo_get)'             ../results/fu_8-libbdinfo-objdump.txt > ../results/fu_8-libbdinfo-function-locations.txt || true
+
+          echo "R25_BDINFO_DEEP_STATIC_RE_CAPTURE=PASS" > ../results/fu_8-result.txt
+          find ../results -type f -print0 | sort -z | xargs -0 sha256sum > ../results/fu_8-results-sha256.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fu_8-R25-BDINFO-DEEP-RE
+          path: fu_8-R25-BDINFO-DEEP-RE/results
+          compression-level: 6
