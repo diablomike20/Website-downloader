@@ -1,0 +1,93 @@
+name: fu_8 R25 cmsd auth static RE
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_8-r25-cmsd-auth-static.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools binutils-mipsel-linux-gnu file python3 >/dev/null
+
+      - name: Extract exact stock cmsd and map transport boundary
+        shell: bash
+        run: |
+          set -euxo pipefail
+          OUT="fu_8-R25-CMSD-AUTH-STATIC"
+          mkdir -p "$OUT/results" "$OUT/work"
+          cd "$OUT/work"
+
+          curl -L --fail --retry 3 -o stock.bin "https://d1jvyy13vm72kv.cloudfront.net/device/upgrade/upgrade_LT500V2-R25-2.4.16-20250804-150319-flash_20729.bin"
+          echo "57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6  stock.bin" | sha256sum -c -
+          tail -c "+2784590" stock.bin > rootfs.squashfs
+          sudo unsquashfs -no-exit-code -d "$PWD/root" rootfs.squashfs >/dev/null 2>&1
+          sudo chown -R "$(id -u):$(id -g)" root
+
+          BIN=root/usr/sbin/cmsd
+          test -f "$BIN"
+          sha256sum "$BIN" > ../results/fu_8-cmsd-sha256.txt
+          file "$BIN" > ../results/fu_8-cmsd-file.txt
+          mipsel-linux-gnu-readelf -d "$BIN" > ../results/fu_8-cmsd-readelf-dynamic.txt
+          mipsel-linux-gnu-readelf -r "$BIN" > ../results/fu_8-cmsd-readelf-relocs.txt
+          mipsel-linux-gnu-readelf -Ws "$BIN" > ../results/fu_8-cmsd-readelf-symbols.txt
+          mipsel-linux-gnu-objdump -d -M no-aliases "$BIN" > ../results/fu_8-cmsd-disassembly.txt
+
+          strings -a -n 4 "$BIN" | grep -Ei \
+            'mqtt|mosquitto|service_call|/usr/lib/lua/cmsd|%s/%s.lua|json|rpc|auth|jwt|verify|tls|ssl|cert|pem|ubus|curl|http|cloud|connect|subscribe|publish|topic|client' \
+            | grep -Evi 'password|passwd|secret|token=|private key|BEGIN .*PRIVATE' \
+            | sort -u > ../results/fu_8-cmsd-transport-auth-strings.txt || true
+
+          cp root/etc/init.d/cmsd ../results/fu_8-source-etc_init.d_cmsd.txt
+          cp root/etc/config/cmsd ../results/fu_8-source-etc_config_cmsd.txt
+          cp root/etc/mosquitto/mosquitto.conf ../results/fu_8-source-mosquitto.conf.txt
+          cp root/etc/mosquitto/aclfile.conf ../results/fu_8-source-mosquitto-acl.txt
+
+          python3 - <<'PY2'
+          from pathlib import Path
+          import csv
+          s=Path('../results/fu_8-cmsd-transport-auth-strings.txt').read_text(errors='replace')
+          init=Path('root/etc/init.d/cmsd').read_text(errors='replace')
+          cfg=Path('root/etc/config/cmsd').read_text(errors='replace')
+          facts=[
+            ('default_disabled', "option enabled '0'" in cfg),
+            ('checkuuid_gate', 'bdinfo checkuuid' in init),
+            ('mac_gate', 'bdinfo mac' in init),
+            ('native_has_mqtt', 'mqtt' in s.lower() or 'mosquitto' in s.lower()),
+            ('native_has_service_call', 'service_call' in s),
+            ('native_has_lua_module_root', '/usr/lib/lua/cmsd' in s),
+            ('native_has_module_path_template', '%s/%s.lua' in s),
+            ('native_has_jwt_symbol', 'jwt_' in s),
+            ('native_has_direct_auth_word', 'auth' in s.lower()),
+            ('native_has_tls_or_cert_words', any(x in s.lower() for x in ('tls','ssl','cert','pem'))),
+            ('native_has_ubus', 'ubus' in s.lower()),
+            ('native_has_http_or_curl', 'http' in s.lower() or 'curl' in s.lower()),
+          ]
+          with open('../results/fu_8-cmsd-auth-facts.csv','w',newline='') as f:
+              w=csv.writer(f); w.writerow(['fact','value'])
+              for k,v in facts: w.writerow([k,str(v).upper()])
+          with open('../results/fu_8-cmsd-auth-boundary-summary.txt','w') as f:
+              for k,v in facts: f.write(f'{k}={str(v).upper()}\n')
+              f.write('INTERPRETATION=Native cmsd clearly owns transport and Lua-module dispatch. Authentication must not be inferred from Lua apprpc alone; classify according to imported/native auth evidence and broker policy.\n')
+          PY2
+
+          echo "R25_CMSD_AUTH_STATIC_RE=PASS" > ../results/fu_8-result.txt
+          find ../results -type f -print0 | sort -z | xargs -0 sha256sum > ../results/fu_8-results-sha256.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fu_8-R25-CMSD-AUTH-STATIC
+          path: fu_8-R25-CMSD-AUTH-STATIC/results
+          compression-level: 6
