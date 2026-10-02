@@ -1,0 +1,99 @@
+name: fu_6 R25 Cudy comment hunt
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_6-r25-cudy-comment-hunt.yml"
+
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Search public Cudy comment pages for LT500/R25 CSP2.5 traces
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p fu_6-r25-comment-hunt
+          python3 - <<'PY'
+          import html, re, urllib.request, urllib.error
+          from pathlib import Path
+
+          OUT=Path("fu_6-r25-comment-hunt")
+          UA="fu_6-r25-comment-hunt/1.0"
+          bases=[
+            "https://www.cudy.com/blogs/news/cudy-software-platform-updates?page={}",
+            "https://www.cudy.com/blogs/faq/how-to-upgrade-the-firmware-of-cudy-router?page={}",
+            "https://www.cudy.com/blogs/faq/beta-firmware-fix-lt18-lt450-lt500-lt500d-and-t-mobile-configuration-issue?page={}",
+          ]
+          needles=re.compile(r'LT500D|LT500\b|R25|CSP\s*2\.5|2\.5\.[0-9]+(?:-20[0-9]{6}-[0-9]{6})?', re.I)
+          fw=re.compile(r'[A-Za-z0-9_.-]*(?:LT500D?|LT500V2|R25)[A-Za-z0-9_.-]*2\.5\.[A-Za-z0-9_.-]+(?:\.zip|\.bin)?', re.I)
+          urlre=re.compile(r'https?://[^\s"<>]+', re.I)
+          results=[]
+          seen=set()
+
+          def fetch(url):
+            req=urllib.request.Request(url,headers={"User-Agent":UA})
+            try:
+              with urllib.request.urlopen(req,timeout=20) as r:
+                return r.status,r.read().decode("utf-8","replace")
+            except urllib.error.HTTPError as e:
+              return e.code,e.read().decode("utf-8","replace")
+            except Exception as e:
+              return 0,str(e)
+
+          def textify(s):
+            s=re.sub(r'<script\b.*?</script>', ' ', s, flags=re.I|re.S)
+            s=re.sub(r'<style\b.*?</style>', ' ', s, flags=re.I|re.S)
+            s=re.sub(r'<[^>]+>', '\n', s)
+            s=html.unescape(s)
+            s=re.sub(r'[ \t\r]+',' ',s)
+            s=re.sub(r'\n+','\n',s)
+            return s
+
+          for base in bases:
+            for page in range(1, 81):
+              url=base.format(page)
+              code,raw=fetch(url)
+              if code!=200:
+                continue
+              txt=textify(raw)
+              lines=txt.splitlines()
+              hits=[i for i,l in enumerate(lines) if needles.search(l)]
+              if not hits:
+                continue
+              blocks=[]
+              for i in hits:
+                a=max(0,i-7); b=min(len(lines),i+8)
+                block='\n'.join(x.strip() for x in lines[a:b] if x.strip())
+                if block not in seen:
+                  seen.add(block); blocks.append(block)
+              if blocks:
+                results.append((url,blocks,sorted(set(fw.findall(txt))),sorted(set(u for u in urlre.findall(txt) if 'LT500' in u or 'R25' in u or '2.5' in u))))
+                print(url, "hits", len(blocks))
+
+          with (OUT/"fu_6-r25-comment-hits.txt").open("w",encoding="utf-8") as f:
+            for url,blocks,fws,urls in results:
+              f.write("\n\n===== "+url+" =====\n")
+              if fws:
+                f.write("FIRMWARE_TOKENS:\n" + "\n".join(fws) + "\n")
+              if urls:
+                f.write("RELATED_URLS:\n" + "\n".join(urls) + "\n")
+              for b in blocks:
+                f.write("\n---\n"+b+"\n")
+
+          allfw=sorted(set(x for _,_,xs,_ in results for x in xs))
+          (OUT/"fu_6-r25-firmware-tokens.txt").write_text("\n".join(allfw)+"\n",encoding="utf-8")
+          print("RESULT_PAGES",len(results))
+          print("FIRMWARE_TOKENS",len(allfw))
+          for x in allfw:
+            print("FW",x)
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fu_6-r25-cudy-comment-hunt
+          path: fu_6-r25-comment-hunt
+          compression-level: 6
+          include-hidden-files: true

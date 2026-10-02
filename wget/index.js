@@ -3,6 +3,9 @@ var crypto = require('crypto');
 var fs = require('fs');
 var path = require('path');
 var archive = require('../archiver');
+var cudyModule = require('../cudy/forensic');
+var cudyForensic = cudyModule.crawl;
+var cudyForensicAll = cudyModule.crawlAllEmulators;
 
 /**
  * Every download gets its own directory under downloads/, which keeps two
@@ -44,6 +47,17 @@ module.exports = (socket, data, onFinished) => {
     send({ error: 'Could not create a working directory on the server: ' + err.message });
     done();
     return null;
+  }
+
+  // Cudy's public emulator is not a normal website mirror. Its frontend
+  // contains a static LuCI route-mapping shim, so use the forensic crawler
+  // instead of wget when an emulator URL is pasted into the existing UI.
+  if (isCudyEmulator(target)) {
+    return startCudyForensic(target, jobId, jobDir, send, done, false);
+  }
+
+  if (isCudySupportIndex(target)) {
+    return startCudyForensic(target, jobId, jobDir, send, done, true);
   }
 
   // execFile rather than exec: the address is passed as a separate argument and
@@ -208,4 +222,98 @@ function removeJobDir(directory) {
   fs.rm(resolved, { recursive: true, force: true }, (err) => {
     if (err) console.error('Could not clean up ' + resolved + ': ' + err.message);
   });
+}
+
+
+function isCudyEmulator(target) {
+  return target &&
+    target.hostname.toLowerCase() === 'support.cudy.com' &&
+    /^\/emulator\/[^/]+\//i.test(target.pathname);
+}
+
+function isCudySupportIndex(target) {
+  return target &&
+    target.hostname.toLowerCase() === 'support.cudy.com' &&
+    (target.pathname === '/' || target.pathname === '');
+}
+
+function startCudyForensic(target, jobId, jobDir, send, done, allEmulators) {
+  var cancelled = false;
+  var outputDir = path.join(jobDir, 'fu_6-cudy-forensic');
+
+  send({
+    progress: allEmulators
+      ? 'Cudy support index detected. Starting fu_6 full emulator archive...\n'
+      : 'Cudy emulator detected. Starting fu_6 forensic mirror...\n'
+  });
+
+  var commonOptions = {
+    output: outputDir,
+    maxRequests: Number(process.env.CUDY_FORENSIC_MAX_REQUESTS) || 0,
+    maxBytes: Number(process.env.CUDY_FORENSIC_MAX_BYTES) || 0,
+    delayMs: Number(process.env.CUDY_FORENSIC_DELAY_MS) || 0,
+    timeoutMs: Number(process.env.CUDY_FORENSIC_TIMEOUT_MS) || 0,
+    shouldCancel: function () { return cancelled; }
+  };
+
+  var run = allEmulators
+    ? cudyForensicAll(Object.assign({}, commonOptions, { indexUrl: target.href }))
+    : cudyForensic(Object.assign({}, commonOptions, { url: target.href }));
+
+  run.then(function (result) {
+    if (cancelled) {
+      removeJobDir(jobDir);
+      done();
+      return;
+    }
+
+    send({
+      progress:
+        (allEmulators
+          ? 'Cudy full emulator archive completed: ' +
+            result.completed + '/' + result.models + ' models.\nArchiving...\n'
+          : 'Cudy forensic mirror completed: ' +
+            result.visited + ' responses, ' +
+            result.routes + ' LuCI routes, ' +
+            result.unresolved + ' unresolved.\nArchiving...\n')
+    });
+
+    var model = allEmulators
+      ? 'CUDY-ALL'
+      : (result.model || 'Cudy').replace(/[^a-zA-Z0-9._-]/g, '_');
+    var zipName = allEmulators
+      ? 'fu_6-CUDY-ALL-EMULATORS-' + jobId
+      : 'fu_6-' + model + '-emulator-forensic-' + jobId;
+
+    archive(outputDir, zipName, function (err, name) {
+      removeJobDir(jobDir);
+
+      if (cancelled) {
+        done();
+        return;
+      }
+
+      if (err) {
+        send({ error: 'The Cudy mirror completed but could not be compressed: ' + err.message });
+      } else {
+        send({ progress: 'Completed', file: name });
+      }
+
+      done();
+    });
+  }).catch(function (err) {
+    removeJobDir(jobDir);
+
+    if (!cancelled) {
+      send({ error: 'Cudy forensic mirror failed: ' + err.message });
+    }
+
+    done();
+  });
+
+  return {
+    cancel: function () {
+      cancelled = true;
+    }
+  };
 }

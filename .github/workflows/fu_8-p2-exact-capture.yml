@@ -1,0 +1,102 @@
+name: fu_8 P2 exact stable beta capture
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_8-p2-exact-capture.yml"
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Capture exact first-party stable and documented beta evidence
+        shell: bash
+        run: |
+          set -u
+          OUT="fu_8-P2-EXACT-CAPTURE"
+          mkdir -p "$OUT"
+          cd "$OUT"
+
+          STABLE_URL="https://www.cudy.com/cdn/shop/files/P2-R91-2.4.29-20260421-190344-sysupgrade.zip"
+          FORUM_API="https://www.cudyforum.it/api/discussions/30"
+
+          echo "STABLE_URL=$STABLE_URL" > fu_8-stable-url.txt
+          if curl -L --fail --retry 3 -A 'Mozilla/5.0' -o fu_8-P2-R91-2.4.29-stable.zip "$STABLE_URL"; then
+            echo "STABLE_DOWNLOAD=PASS" > fu_8-stable-result.txt
+            sha256sum fu_8-P2-R91-2.4.29-stable.zip > fu_8-stable-sha256.txt
+            md5sum fu_8-P2-R91-2.4.29-stable.zip > fu_8-stable-md5.txt
+            stat -c 'STABLE_BYTES=%s' fu_8-P2-R91-2.4.29-stable.zip > fu_8-stable-size.txt
+            file fu_8-P2-R91-2.4.29-stable.zip > fu_8-stable-file.txt
+            unzip -t fu_8-P2-R91-2.4.29-stable.zip > fu_8-stable-unzip-test.txt 2>&1 || true
+            mkdir -p stable-extracted
+            unzip -o fu_8-P2-R91-2.4.29-stable.zip -d stable-extracted >/dev/null 2>&1 || true
+            find stable-extracted -type f -print0 | sort -z | xargs -0 -r sha256sum > fu_8-stable-inner-sha256.txt
+          else
+            echo "STABLE_DOWNLOAD=FAIL" > fu_8-stable-result.txt
+          fi
+
+          if curl -L --fail --retry 3 -A 'Mozilla/5.0' -H 'Accept: application/vnd.api+json' -o forum-api.json "$FORUM_API"; then
+            echo "FORUM_API=PASS" > fu_8-forum-api-result.txt
+            grep -aoE 'https:\\/\\/mega\.nz\\/file\\/qNgxhC6I#[A-Za-z0-9_-]+' forum-api.json |
+              sed 's#\\/#/#g' | sort -u > fu_8-beta-mega-links.txt || true
+            if [ ! -s fu_8-beta-mega-links.txt ]; then
+              grep -aoE 'https://mega\.nz/file/qNgxhC6I#[A-Za-z0-9_-]+' forum-api.json |
+                sort -u > fu_8-beta-mega-links.txt || true
+            fi
+          else
+            echo "FORUM_API=FAIL" > fu_8-forum-api-result.txt
+            : > fu_8-beta-mega-links.txt
+          fi
+
+          BETA=$(head -1 fu_8-beta-mega-links.txt 2>/dev/null || true)
+          if [ -n "$BETA" ]; then
+            echo "BETA_MEGA_URL=$BETA" > fu_8-beta-url.txt
+            sudo apt-get update -qq || true
+            if sudo apt-get install -y -qq megatools; then
+              mkdir -p beta-download
+              if megadl --path=beta-download "$BETA"; then
+                echo "BETA_DOWNLOAD=PASS" > fu_8-beta-result.txt
+                find beta-download -type f -printf '%P\t%s\n' | sort > fu_8-beta-files.txt
+                find beta-download -type f -print0 | sort -z | xargs -0 -r sha256sum > fu_8-beta-sha256.txt
+                for f in beta-download/*; do
+                  [ -f "$f" ] || continue
+                  file "$f" >> fu_8-beta-filetypes.txt
+                  case "$f" in
+                    *.zip) unzip -t "$f" >> fu_8-beta-unzip-test.txt 2>&1 || true ;;
+                  esac
+                done
+              else
+                echo "BETA_DOWNLOAD=FAIL" > fu_8-beta-result.txt
+              fi
+            else
+              echo "MEGATOOLS_INSTALL=FAIL" > fu_8-beta-result.txt
+            fi
+          else
+            echo "BETA_FULL_MEGA_URL_NOT_RECOVERED" > fu_8-beta-result.txt
+          fi
+
+          {
+            echo "=== stable ==="
+            cat fu_8-stable-result.txt 2>/dev/null || true
+            cat fu_8-stable-sha256.txt 2>/dev/null || true
+            echo "=== forum api ==="
+            cat fu_8-forum-api-result.txt 2>/dev/null || true
+            echo "=== beta exact link ==="
+            cat fu_8-beta-mega-links.txt 2>/dev/null || true
+            echo "=== beta ==="
+            cat fu_8-beta-result.txt 2>/dev/null || true
+            cat fu_8-beta-sha256.txt 2>/dev/null || true
+          } > fu_8-summary.txt
+
+          sha256sum forum-api.json 2>/dev/null > fu_8-source-page-sha256.txt || true
+          echo "P2_EXACT_CAPTURE_DONE" > fu_8-result.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fu_8-P2-EXACT-CAPTURE
+          path: fu_8-P2-EXACT-CAPTURE
+          compression-level: 0
+          include-hidden-files: true

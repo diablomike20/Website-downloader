@@ -1,0 +1,60 @@
+name: fu_6 C200P 2.5.14 artifact capture
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_6-c200p-2514-capture.yml"
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download exact first-party C200P 2.5.14 artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p fu_6-C200P-R74-2.5.14
+          cd fu_6-C200P-R74-2.5.14
+
+          URL="https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.14-20260618-150931-flash.zip"
+          ZIP="fu_6-C200P-R74-2.5.14-20260618-150931-flash.zip"
+
+          curl -L --fail --retry 3 --retry-delay 2 -o "$ZIP" "$URL"
+
+          echo "SOURCE_URL=$URL" | tee fu_6-source.txt
+          sha256sum "$ZIP" | tee fu_6-sha256.txt
+          md5sum "$ZIP" | tee fu_6-md5.txt
+          stat -c 'ZIP_BYTES=%s' "$ZIP" | tee fu_6-size.txt
+          file "$ZIP" | tee fu_6-file.txt
+
+          unzip -l "$ZIP" | tee fu_6-unzip-list.txt
+          unzip -o "$ZIP" -d extracted
+
+          echo "=== extracted checksums ===" | tee fu_6-extracted-checksums.txt
+          find extracted -type f -print0 | sort -z | xargs -0 sha256sum | tee -a fu_6-extracted-checksums.txt
+          echo "=== extracted file types ===" | tee fu_6-extracted-filetypes.txt
+          find extracted -type f -print0 | sort -z | xargs -0 file | tee -a fu_6-extracted-filetypes.txt
+
+          echo "=== md5.txt ===" | tee fu_6-inner-md5.txt
+          find extracted -type f -name md5.txt -exec cat {} \; | tee -a fu_6-inner-md5.txt
+
+          BIN=$(find extracted -type f -name '*.bin' | head -1 || true)
+          if [ -n "$BIN" ]; then
+            echo "BIN=$BIN" | tee fu_6-bin-info.txt
+            stat -c 'BIN_BYTES=%s' "$BIN" | tee -a fu_6-bin-info.txt
+            sha256sum "$BIN" | tee -a fu_6-bin-info.txt
+            md5sum "$BIN" | tee -a fu_6-bin-info.txt
+            file "$BIN" | tee -a fu_6-bin-info.txt
+            grep -aob 'hsqs' "$BIN" | head -20 | tee fu_6-squashfs-offsets.txt || true
+            grep -aob 'R74' "$BIN" | head -50 | tee fu_6-r74-offsets.txt || true
+            grep -aob '2.5.14' "$BIN" | head -50 | tee fu_6-version-offsets.txt || true
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fu_6-C200P-R74-2.5.14-20260618-150931
+          path: fu_6-C200P-R74-2.5.14
+          compression-level: 0
+          include-hidden-files: true

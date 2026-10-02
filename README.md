@@ -25,6 +25,78 @@ Download the complete source code of any website (including all assets) 🔨.
 - --adjust-extension – Adds suitable extensions to filenames (html or css) depending on their content-type.
 - --page-requisites – Download things like CSS style-sheets and images required to properly display the page offline.
 - --no-parent – When recursing do not ascend to the parent directory. It useful for restricting the download to only a portion of the site
+
+## fu_6 Cudy Emulator Forensic mode
+
+This fork now contains a Cudy-specific read-only crawler for the public emulator trees under:
+
+```text
+https://support.cudy.com/emulator/<MODEL>/
+```
+
+Unlike a normal `wget --mirror`, it also scans downloaded HTML/JS for LuCI routes and reproduces the public emulator bootstrap's static route mapping. This is useful for snapshots that are not reachable by simply clicking through the visible menus.
+
+It preserves response bytes exactly and writes SHA-256 hashes and a route inventory.
+
+**fu_6 policy: a Cudy emulator capture is exhaustive by default.** There is no default request-count cap, response-size cap, asset-type filter, crawl delay, or artificial request timeout. Fonts, icons, media, JavaScript, CSS, JSON, HTML, binary download responses and static LuCI snapshots are all retained when they are referenced inside the selected emulator tree.
+
+The recursive boundary is the selected public `/emulator/<MODEL>/` subtree so a capture does not accidentally turn into a crawl of unrelated websites. Live destructive actions are never invoked, but their public static emulator snapshots are preserved when the emulator exposes them.
+
+### Run
+
+```bash
+npm run cudy-forensic -- \
+  --url https://support.cudy.com/emulator/C200P/ \
+  --output cudy-forensic-output/C200P
+```
+
+Optional operator limits are available only when you explicitly want them:
+
+```bash
+npm run cudy-forensic -- \
+  --url https://support.cudy.com/emulator/C200P/ \
+  --max-requests 2500 \
+  --max-bytes 67108864 \
+  --delay-ms 100 \
+  --timeout-ms 20000
+```
+
+A value of `0` (the default) means unlimited/no artificial limit for request count, response size and timeout.
+
+To capture **every emulator currently listed by the Cudy support index**, with the same exhaustive defaults:
+
+```bash
+npm run cudy-forensic -- --all
+```
+
+Or choose an archive root:
+
+```bash
+npm run cudy-forensic -- --all --output cudy-forensic-output
+```
+
+This creates one full capture per model plus `fu_6-models.json` and a cross-model `fu_6-routes-master.txt`.
+
+The output contains:
+
+```text
+raw/                         byte-exact public responses
+fu_6-inventory.csv           URL/status/MIME/size/SHA256/local path
+fu_6-all-luci-routes.txt     LuCI routes found in HTML/JS
+fu_6-hidden-luci-routes.txt  routes mapped to emulator snapshots
+fu_6-unresolved.txt          failed/non-2xx URLs
+fu_6-findings.json           firmware/build/model/URL leads
+fu_6-run.json                run settings and safety record
+```
+
+The crawler is intentionally read-only: **GET only** and one selected emulator-model subtree recursively. It does not invoke live destructive actions, authentication bypass, brute force, firmware-version guessing or timestamp spraying. Static emulator snapshots of action pages are still downloaded so the offline archive does not lose UI material.
+
+Run the route-mapping tests with:
+
+```bash
+npm run test:cudy
+```
+
 ### Deploy on cloud providers
 [![Run on Replit](https://binbashbanana.github.io/deploy-buttons/buttons/remade/replit.svg)](https://replit.com/github/AhmadIbrahiim/Website-downloader)
 [![Remix on Glitch](https://binbashbanana.github.io/deploy-buttons/buttons/remade/glitch.svg)](https://glitch.com/edit/#!/import/github/AhmadIbrahiim/Website-downloader)
@@ -44,7 +116,7 @@ Download the complete source code of any website (including all assets) 🔨.
 
 ## How to run it 🤔
 
-- `git clone https://github.com/AhmadIbrahiim/Website-downloader.git`
+- `git clone https://github.com/diablomike20/Website-downloader.git`
 - `cd Website-downloader`
 - `$ npm install`
 - `$ npm start`
@@ -66,7 +138,7 @@ Download the complete source code of any website (including all assets) 🔨.
 
 ## Liked it ? You can buy a coffee:
 
-<a href="https://www.buymeacoffee.com/aibrahim" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
+<a href="https://www.buymeacoffee.com/aibrahim" target="_blank"><img src="https://www.buymeacoffee.com/aibrahim" alt=""></a>
 
 Thank you,
 

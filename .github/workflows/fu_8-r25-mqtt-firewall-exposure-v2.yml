@@ -1,0 +1,115 @@
+name: fu_8 R25 MQTT firewall exposure static audit V2
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_8-r25-mqtt-firewall-exposure-v2.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools python3 >/dev/null
+
+      - name: Exact stock firewall audit V2
+        shell: bash
+        run: |
+          set -euxo pipefail
+          OUT="fu_8-R25-MQTT-FIREWALL-EXPOSURE-V2"
+          mkdir -p "$OUT/results" "$OUT/work"
+          cd "$OUT/work"
+
+          curl -L --fail --retry 3 -o stock.bin "https://d1jvyy13vm72kv.cloudfront.net/device/upgrade/upgrade_LT500V2-R25-2.4.16-20250804-150319-flash_20729.bin"
+          echo "57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6  stock.bin" | sha256sum -c -
+          tail -c "+2784590" stock.bin > rootfs.squashfs
+          sudo unsquashfs -no-exit-code -d "$PWD/root" rootfs.squashfs >/dev/null 2>&1
+          sudo chown -R "$(id -u):$(id -g)" root
+
+          cp root/etc/config/firewall ../results/fu_8-source-etc_config_firewall.txt
+          [ -f root/etc/firewall.user ] && cp root/etc/firewall.user ../results/fu_8-source-etc_firewall.user.txt || true
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,csv,json
+
+          fw=Path('root/etc/config/firewall').read_text(errors='replace')
+          sections=[]
+          current=None
+          for raw in fw.splitlines():
+              line=raw.strip()
+              if not line or line.startswith('#'):
+                  continue
+              m=re.match(r"config\s+(\S+)(?:\s+['\"]?([^'\"]+)['\"]?)?$", line)
+              if m:
+                  current={'type':m.group(1),'name':(m.group(2) or '').strip(),'options':{},'lists':{}}
+                  sections.append(current)
+                  continue
+              m=re.match(r"option\s+(\S+)\s+(.+)$", line)
+              if m and current:
+                  current['options'][m.group(1)] = m.group(2).strip().strip("'\"")
+                  continue
+              m=re.match(r"list\s+(\S+)\s+(.+)$", line)
+              if m and current:
+                  current['lists'].setdefault(m.group(1),[]).append(m.group(2).strip().strip("'\""))
+
+          zones=[]
+          rules=[]
+          for s in sections:
+              if s['type']=='zone':
+                  zones.append({
+                      'name':s['options'].get('name',''),
+                      'input':s['options'].get('input',''),
+                      'output':s['options'].get('output',''),
+                      'forward':s['options'].get('forward',''),
+                      'network':' '.join(s['lists'].get('network',[])),
+                  })
+              if s['type'] in ('rule','redirect'):
+                  blob=' '.join([s['name']]+list(s['options'].keys())+list(s['options'].values())+
+                                [x for vals in s['lists'].values() for x in vals]).lower()
+                  if any(x in blob for x in ('1883','8883','mosquitto','cmagent')):
+                      rules.append({'type':s['type'],'name':s['name'],'options':s['options'],'lists':s['lists']})
+
+          with open('../results/fu_8-firewall-zones.csv','w',newline='') as f:
+              w=csv.DictWriter(f,fieldnames=['name','input','output','forward','network'])
+              w.writeheader(); w.writerows(zones)
+          Path('../results/fu_8-mqtt-explicit-firewall-rules.json').write_text(json.dumps(rules,indent=2,sort_keys=True))
+
+          wan=next((z for z in zones if z['name']=='wan'),None)
+          lan=next((z for z in zones if z['name']=='lan'),None)
+          with open('../results/fu_8-mqtt-firewall-summary.txt','w') as f:
+              f.write(f"WAN_ZONE_FOUND={wan is not None}\n")
+              if wan:
+                  f.write(f"WAN_INPUT={wan['input']}\nWAN_OUTPUT={wan['output']}\nWAN_FORWARD={wan['forward']}\n")
+              f.write(f"LAN_ZONE_FOUND={lan is not None}\n")
+              if lan:
+                  f.write(f"LAN_INPUT={lan['input']}\n")
+              f.write(f"EXPLICIT_MQTT_FIREWALL_RULE_COUNT={len(rules)}\n")
+              f.write("STATIC_POLICY_ONLY=YES\n")
+          PY
+
+          # Exact same-line mutation evidence for MQTT ports only.
+          find root/etc root/usr/lib root/usr/sbin root/usr/bin -type f -print0 2>/dev/null             | xargs -0 -r grep -IanE '(iptables|ip6tables|fw3|uci (add|set|delete)|ubus call firewall)[^\n]*(1883|8883)|(1883|8883)[^\n]*(iptables|ip6tables|fw3|uci (add|set|delete)|ubus call firewall)' 2>/dev/null             | sed 's#^root/##'             | awk 'length($0)<1000'             > ../results/fu_8-mqtt-port-firewall-mutators.txt || true
+
+          MUT=$(wc -l < ../results/fu_8-mqtt-port-firewall-mutators.txt)
+          echo "STATIC_MQTT_PORT_FIREWALL_MUTATOR_COUNT=$MUT" >> ../results/fu_8-mqtt-firewall-summary.txt
+          echo "INTERPRETATION=All-interface listener binding does not override firewall zone policy." >> ../results/fu_8-mqtt-firewall-summary.txt
+
+          echo "R25_MQTT_FIREWALL_EXPOSURE_STATIC_V2=PASS" > ../results/fu_8-result.txt
+          find ../results -type f -print0 | sort -z | xargs -0 sha256sum > ../results/fu_8-results-sha256.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fu_8-R25-MQTT-FIREWALL-EXPOSURE-V2
+          path: fu_8-R25-MQTT-FIREWALL-EXPOSURE-V2/results
+          compression-level: 6

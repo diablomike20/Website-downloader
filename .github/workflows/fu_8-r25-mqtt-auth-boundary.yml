@@ -1,0 +1,103 @@
+name: fu_8 R25 MQTT auth boundary RE
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_8-r25-mqtt-auth-boundary.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools binutils-mipsel-linux-gnu file python3 >/dev/null
+
+      - name: Extract exact stock broker/auth boundary
+        shell: bash
+        run: |
+          set -euxo pipefail
+          OUT="fu_8-R25-MQTT-AUTH-BOUNDARY"
+          mkdir -p "$OUT/results" "$OUT/work"
+          cd "$OUT/work"
+
+          curl -L --fail --retry 3 -o stock.bin "https://d1jvyy13vm72kv.cloudfront.net/device/upgrade/upgrade_LT500V2-R25-2.4.16-20250804-150319-flash_20729.bin"
+          echo "57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6  stock.bin" | sha256sum -c -
+          tail -c "+2784590" stock.bin > rootfs.squashfs
+          sudo unsquashfs -no-exit-code -d "$PWD/root" rootfs.squashfs >/dev/null 2>&1
+          sudo chown -R "$(id -u):$(id -g)" root
+
+          test -f root/etc/mosquitto/mosquitto.conf
+          cp root/etc/mosquitto/mosquitto.conf ../results/fu_8-source-mosquitto.conf.txt
+          [ -f root/etc/mosquitto/aclfile.conf ] && cp root/etc/mosquitto/aclfile.conf ../results/fu_8-source-mosquitto-acl.txt || true
+
+          PLUGIN=root/usr/lib/auth_plugin_jwt.so
+          test -f "$PLUGIN"
+          sha256sum "$PLUGIN" > ../results/fu_8-auth-plugin-jwt-sha256.txt
+          file "$PLUGIN" > ../results/fu_8-auth-plugin-jwt-file.txt
+          mipsel-linux-gnu-readelf -d "$PLUGIN" > ../results/fu_8-auth-plugin-jwt-dynamic.txt
+          mipsel-linux-gnu-readelf -Ws "$PLUGIN" > ../results/fu_8-auth-plugin-jwt-symbols.txt
+
+          strings -a -n 4 "$PLUGIN" | grep -Ei             'jwt_|bdinfo|username|grant|verify|hmac|pem|acl|auth|mosquitto_auth|EVP_Digest|libbdinfo'             | grep -Evi 'secret|password|passwd|private key|token='             | sort -u > ../results/fu_8-auth-plugin-jwt-focused-strings.txt || true
+
+          # Inventory certificate/key presence and hashes only; never export private key bytes.
+          {
+            for p in root/var/etc/mosquitto/ca.crt root/var/etc/mosquitto/client.crt root/var/etc/mosquitto/client.key                      root/etc/mosquitto/ca.crt root/etc/mosquitto/client.crt root/etc/mosquitto/client.key; do
+              if [ -f "$p" ]; then
+                printf '%s\t' "${p#root/}"
+                sha256sum "$p" | awk '{print $1}'
+              fi
+            done
+          } > ../results/fu_8-mqtt-cert-key-inventory.txt
+
+          # Look for static firewall/config ownership references only.
+          grep -RInaE '(^|[^0-9])(1883|8883)([^0-9]|$)|mosquitto|cmagent'             root/etc/config root/etc/firewall* root/etc/init.d 2>/dev/null             | sed "s#root/##" > ../results/fu_8-mqtt-firewall-config-crossref.txt || true
+
+          # Find stock scripts/defaults that mutate MQTT/broker configuration.
+          find root/etc/uci-defaults root/etc/init.d root/usr/sbin root/usr/bin -type f -print0 2>/dev/null             | xargs -0 -r grep -IanE 'mosquitto|auth_plugin_jwt|aclfile|8883|1883' 2>/dev/null             | sed "s#root/##" > ../results/fu_8-mqtt-mutator-crossref.txt || true
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,csv
+          conf=Path('root/etc/mosquitto/mosquitto.conf').read_text(errors='replace')
+          acl=Path('root/etc/mosquitto/aclfile.conf').read_text(errors='replace') if Path('root/etc/mosquitto/aclfile.conf').exists() else ''
+          plugin=Path('../results/fu_8-auth-plugin-jwt-focused-strings.txt').read_text(errors='replace')
+          facts=[
+            ('listener_1883_any', bool(re.search(r'^\s*listener\s+1883\s+0\.0\.0\.0\s*$',conf,re.M))),
+            ('listener_8883_any', bool(re.search(r'^\s*listener\s+8883\s+0\.0\.0\.0\s*$',conf,re.M))),
+            ('allow_anonymous_false', bool(re.search(r'^\s*allow_anonymous\s+false\s*$',conf,re.M))),
+            ('jwt_auth_plugin_configured', 'auth_plugin_jwt.so' in conf),
+            ('acl_file_configured', bool(re.search(r'^\s*acl_file\s+',conf,re.M))),
+            ('require_certificate_true', bool(re.search(r'^\s*require_certificate\s+true\s*$',conf,re.M))),
+            ('acl_has_device_identity', 'cudydevice' in acl),
+            ('acl_has_admin_identity', 'admincudydevice' in acl),
+            ('plugin_links_bdinfo', 'libbdinfo' in plugin or 'bdinfo' in plugin),
+            ('plugin_has_jwt_verify', 'jwt_verify_' in plugin),
+            ('plugin_has_hmac', 'hmac' in plugin.lower()),
+          ]
+          with open('../results/fu_8-mqtt-auth-facts.csv','w',newline='') as f:
+              w=csv.writer(f); w.writerow(['fact','value'])
+              for k,v in facts: w.writerow([k,str(v).upper()])
+          with open('../results/fu_8-mqtt-auth-summary.txt','w') as f:
+              for k,v in facts: f.write(f'{k}={str(v).upper()}\n')
+              f.write('INTERPRETATION=Broker-level JWT/ACL authentication is distinct from the optional cmagent -j client flag.\n')
+              f.write('NETWORK_REACHABILITY=Listener binding alone does not establish WAN reachability; firewall/runtime policy remains a separate layer.\n')
+          PY
+
+          echo "R25_MQTT_AUTH_BOUNDARY_RE=PASS" > ../results/fu_8-result.txt
+          find ../results -type f -print0 | sort -z | xargs -0 sha256sum > ../results/fu_8-results-sha256.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fu_8-R25-MQTT-AUTH-BOUNDARY
+          path: fu_8-R25-MQTT-AUTH-BOUNDARY/results
+          compression-level: 6

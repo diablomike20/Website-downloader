@@ -1,0 +1,161 @@
+name: fu_8 P2 public 2.4.22 to 2.4.29 UBI rootfs diff
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_8-p2-public-2422-to-2429-diff.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Install extraction stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools unzip file python3-pip >/dev/null
+          python3 -m pip install --break-system-packages ubi-reader >/dev/null
+
+      - name: Extract exact public-generation delta
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          OUT="fu_8-P2-2.4.22-vs-2.4.29-PUBLIC-DELTA"
+          mkdir -p "$OUT/work" "$OUT/results"
+          cd "$OUT/work"
+
+          ART_URL="https://api.github.com/repos/diablomike20/Website-downloader/actions/artifacts/11068611598/zip"
+          curl -L --fail --retry 3 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -o fu7-clean-master.zip "$ART_URL"
+          unzip -q fu7-clean-master.zip -d fu7-clean-master
+          OLD=$(find fu7-clean-master -type f -name 'P2-R91-2.4.22-20251204-184925-sysupgrade.bin' | head -1)
+          test -n "$OLD"
+          echo "592c494eb5f44beabb427907003801845ea0d47d51db50b1d5b97d40e3166b58  $OLD" | sha256sum -c -
+
+          URL29="https://www.cudy.com/cdn/shop/files/P2-R91-2.4.29-20260421-190344-sysupgrade.zip"
+          curl -L --fail --retry 3 -o stable29.zip "$URL29"
+          echo "610a783202e1768156b5b9368de8a136565f4186f18bca88ea4c2144819658ab  stable29.zip" | sha256sum -c -
+          unzip -q stable29.zip -d stable29
+          NEW=$(find stable29 -type f -name 'P2-R91-2.4.29-20260421-190344-sysupgrade.bin' | head -1)
+          test -n "$NEW"
+          echo "33c9650709eb012348c0d7df31cb3d41ceefbf7d9ca8cebd0b22e0e0524a789c  $NEW" | sha256sum -c -
+
+          sha256sum "$OLD" "$NEW" > ../results/fu_8-payload-sha256.txt
+          stat -c '%n %s' "$OLD" "$NEW" > ../results/fu_8-payload-sizes.txt
+
+          for side in old new; do
+            [ "$side" = old ] && BIN="$OLD" || BIN="$NEW"
+            U=$(grep -aob 'UBI#' "$BIN" | cut -d: -f1 | head -1)
+            printf '%s_ubi_dec=%s\n%s_ubi_hex=0x%X\n' "$side" "$U" "$side" "$U" >> ../results/fu_8-ubi-layout.txt
+            tail -c "+$((U+1))" "$BIN" > "$side.ubi"
+            ubireader_display_info "$side.ubi" > "../results/fu_8-$side-ubi-info.txt" 2>&1
+            mkdir "$side-vols"
+            ubireader_extract_images -o "$side-vols" "$side.ubi" > "../results/fu_8-$side-ubi-extract.log" 2>&1
+            ROOTVOL=""
+            while IFS= read -r v; do
+              [ "$(head -c4 "$v" 2>/dev/null || true)" = "hsqs" ] && { ROOTVOL="$v"; break; }
+            done < <(find "$side-vols" -type f | sort)
+            test -n "$ROOTVOL"
+            echo "$side=$ROOTVOL" >> ../results/fu_8-root-volume-selection.txt
+            unsquashfs -s "$ROOTVOL" > "../results/fu_8-$side-squashfs-superblock.txt" 2>&1
+            mkdir "$side-root"
+            sudo unsquashfs -no-exit-code -d "$PWD/$side-root" "$ROOTVOL" > "../results/fu_8-$side-unsquashfs.log" 2>&1
+          done
+
+          sudo python3 - <<'PY'
+          import os,stat,hashlib,csv,json
+          def scan(root):
+              out={}
+              for base,dirs,files in os.walk(root,topdown=True,followlinks=False):
+                  for n in dirs+files:
+                      p=os.path.join(base,n); rel=os.path.relpath(p,root)
+                      try: st=os.lstat(p)
+                      except FileNotFoundError: continue
+                      m=st.st_mode
+                      if stat.S_ISREG(m):
+                          with open(p,'rb') as fh: h=hashlib.sha256(fh.read()).hexdigest()
+                          typ='file'; target=''
+                      elif stat.S_ISDIR(m): typ='dir'; h=''; target=''
+                      elif stat.S_ISLNK(m): typ='symlink'; h=''; target=os.readlink(p)
+                      elif stat.S_ISCHR(m): typ='char'; h=''; target=f'{os.major(st.st_rdev)}:{os.minor(st.st_rdev)}'
+                      elif stat.S_ISBLK(m): typ='block'; h=''; target=f'{os.major(st.st_rdev)}:{os.minor(st.st_rdev)}'
+                      elif stat.S_ISFIFO(m): typ='fifo'; h=''; target=''
+                      elif stat.S_ISSOCK(m): typ='socket'; h=''; target=''
+                      else: typ='other'; h=''; target=''
+                      out[rel]=(typ,oct(stat.S_IMODE(m)),st.st_uid,st.st_gid,st.st_size,h,target)
+              return out
+          A=scan('old-root'); B=scan('new-root')
+          rows=[]; counts={}
+          for p in sorted(set(A)|set(B)):
+              a=A.get(p); b=B.get(p)
+              if a is None: s='ADDED_2429'
+              elif b is None: s='REMOVED_2429'
+              elif a==b: s='UNCHANGED'
+              else: s='CHANGED_COMMON'
+              counts[s]=counts.get(s,0)+1
+              rows.append((p,s,a,b))
+          with open('../results/fu_8-rootfs-diff.csv','w',newline='') as f:
+              w=csv.writer(f); w.writerow(['path','status','old_type','new_type','old_mode','new_mode','old_size','new_size','old_sha256','new_sha256','old_target','new_target'])
+              for p,s,a,b in rows:
+                  aa=a or ('','','','','','',''); bb=b or ('','','','','','','')
+                  w.writerow([p,s,aa[0],bb[0],aa[1],bb[1],aa[4],bb[4],aa[5],bb[5],aa[6],bb[6]])
+          json.dump({'counts':counts,'entries_2422':len(A),'entries_2429':len(B)},open('../results/fu_8-rootfs-diff-summary.json','w'),indent=2,sort_keys=True)
+          for status,name in [('ADDED_2429','fu_8-added-2429.txt'),('REMOVED_2429','fu_8-removed-2429.txt'),('CHANGED_COMMON','fu_8-changed-common.txt')]:
+              with open('../results/'+name,'w') as f:
+                  for p,s,a,b in rows:
+                      if s==status: f.write(p+'\n')
+          focus=('etc/hotplug.d/','usr/lib/4g/','etc/config/','etc/init.d/','usr/lib/lua/luci/','usr/bin/','usr/sbin/')
+          with open('../results/fu_8-cellular-focused-delta.txt','w') as f:
+              for p,s,a,b in rows:
+                  if s!='UNCHANGED' and p.startswith(focus): f.write(f'{s}\t{p}\n')
+          PY
+          sudo chown -R "$(id -u):$(id -g)" ../results
+
+          for p in etc/hotplug.d/gcom/30-4g etc/hotplug.d/tty/30-4g usr/lib/4g/check.sh usr/lib/4g/reup.sh; do
+            {
+              echo "===== $p ====="
+              echo "--- 2.4.22 ---"
+              if [ -e "old-root/$p" ]; then sha256sum "old-root/$p"; sed -n '1,500p' "old-root/$p"; else echo ABSENT; fi
+              echo "--- 2.4.29 ---"
+              if [ -e "new-root/$p" ]; then sha256sum "new-root/$p"; sed -n '1,500p' "new-root/$p"; else echo ABSENT; fi
+              echo
+            } >> ../results/fu_8-event-layer-exact-content.txt
+          done
+
+          mkdir -p ../results/source-diffs
+          {
+            cat ../results/fu_8-changed-common.txt
+            cat ../results/fu_8-added-2429.txt
+          } | grep -E '^(usr/lib/4g/|etc/hotplug.d/)' | while IFS= read -r p; do
+            safe=$(echo "$p" | tr '/' '_')
+            if [ -f "old-root/$p" ] && [ -f "new-root/$p" ]; then
+              diff -u "old-root/$p" "new-root/$p" > "../results/source-diffs/$safe.diff" || true
+            elif [ -f "new-root/$p" ]; then
+              cp "new-root/$p" "../results/source-diffs/$safe.added"
+            fi
+          done
+
+          for rootdir in old-root new-root; do
+            tag=$(echo "$rootdir" | sed 's/-root$//')
+            grep -RIal -E 'rom_research|rom_develop|QNETDEVSTATUS|NDISSTAT|network\.gcom reup|exec_reup_4g|exec_debug_info' "$rootdir" 2>/dev/null | sed "s#^$rootdir/##" | sort > "../results/fu_8-$tag-marker-hits.txt" || true
+          done
+
+          echo "P2_PUBLIC_2422_TO_2429_ROOTFS_DIFF=PASS" > ../results/fu_8-result.txt
+          find ../results -type f -maxdepth 2 -print0 | sort -z | xargs -0 sha256sum > ../results/fu_8-results-sha256.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fu_8-P2-2.4.22-vs-2.4.29-PUBLIC-DELTA
+          path: fu_8-P2-2.4.22-vs-2.4.29-PUBLIC-DELTA/results
+          compression-level: 6
+          include-hidden-files: true

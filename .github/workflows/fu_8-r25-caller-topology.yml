@@ -1,0 +1,196 @@
+name: fu_8 R25 2.4.16 caller topology RE
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_8-r25-caller-topology.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  re:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Install static RE tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools file binutils-mipsel-linux-gnu binutils python3 qemu-user iproute2 >/dev/null
+
+      - name: Download exact stock R25 and extract caller topology
+        shell: bash
+        run: |
+          set -euxo pipefail
+          OUT="fu_8-R25-2.4.16-CALLER-TOPOLOGY"
+          mkdir -p "$OUT/results" "$OUT/work"
+          cd "$OUT/work"
+
+          STOCK_URL="https://d1jvyy13vm72kv.cloudfront.net/device/upgrade/upgrade_LT500V2-R25-2.4.16-20250804-150319-flash_20729.bin"
+          STOCK_SHA="57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6"
+          curl -L --fail --retry 3 --retry-delay 2 -o stock.bin "$STOCK_URL"
+          echo "$STOCK_SHA  stock.bin" | sha256sum -c -
+          stat -c 'stock_size=%s' stock.bin > ../results/fu_8-stock-identity.txt
+          sha256sum stock.bin >> ../results/fu_8-stock-identity.txt
+          file stock.bin >> ../results/fu_8-stock-identity.txt
+
+          # Known exact stock geometry, then independently verify SquashFS magic.
+          ROOTFS_OFF=2784589
+          printf 'rootfs_offset_dec=%s\nrootfs_offset_hex=0x%X\n' "$ROOTFS_OFF" "$ROOTFS_OFF" > ../results/fu_8-rootfs-layout.txt
+          python3 - <<'PY'
+          d=open('stock.bin','rb').read()
+          hits=[]
+          p=0
+          while True:
+              i=d.find(b'hsqs',p)
+              if i<0: break
+              hits.append(i); p=i+1
+          open('../results/fu_8-squashfs-magic-offsets.txt','w').write('\n'.join(f'{x} 0x{x:x}' for x in hits)+'\n')
+          if 2784589 not in hits:
+              raise SystemExit('expected stock SquashFS magic not found')
+          PY
+          tail -c "+$((ROOTFS_OFF+1))" stock.bin > rootfs.squashfs
+          unsquashfs -s rootfs.squashfs > ../results/fu_8-squashfs-superblock.txt
+          sudo unsquashfs -no-exit-code -d "$PWD/root" rootfs.squashfs > ../results/fu_8-unsquashfs.log 2>&1
+          sudo chown -R "$(id -u):$(id -g)" root
+
+          # Provenance fingerprints for critical components.
+          for p in             usr/sbin/hcshd             etc/init.d/hcsh             usr/sbin/cmagent             etc/init.d/cmagent             etc/config/cmagent             usr/sbin/cmsd             etc/init.d/cmsd             etc/config/cmsd             etc/init.d/dropbear             etc/init.d/telnet             etc/uci-defaults/11_fix_passwd             usr/libexec/login.sh; do
+            if [ -e "root/$p" ]; then
+              sha256sum "root/$p" >> ../results/fu_8-critical-sha256.txt
+              file "root/$p" >> ../results/fu_8-critical-filetypes.txt
+            else
+              echo "ABSENT $p" >> ../results/fu_8-critical-sha256.txt
+            fi
+          done
+
+          # Exact init/access files for reconciliation.
+          for p in etc/init.d/hcsh etc/init.d/dropbear etc/init.d/telnet etc/uci-defaults/11_fix_passwd usr/libexec/login.sh etc/init.d/cmagent etc/config/cmagent etc/init.d/cmsd etc/config/cmsd; do
+            if [ -f "root/$p" ]; then
+              safe=$(echo "$p" | tr '/' '_')
+              cp "root/$p" "../results/fu_8-source-$safe.txt"
+            fi
+          done
+
+          # Locate all local references. Only regular files are scanned.
+          find root -type f -print0 | xargs -0 -r grep -IanE             'hcshd|(/|[^A-Za-z0-9_])hcsh([^A-Za-z0-9_]|$)|56791|cmagent\.send|router[^[:alnum:]]+command|service_call|shell cmd|RSA_public_decrypt'             2>/dev/null | sed 's#^root/##' > ../results/fu_8-rootfs-caller-crossref.txt || true
+
+          find root -type f -print0 | xargs -0 -r grep -Il             'cmagent.send' 2>/dev/null | sed 's#^root/##' | sort > ../results/fu_8-cmagent-send-files.txt || true
+          find root -type f -print0 | xargs -0 -r grep -Il             'hcshd' 2>/dev/null | sed 's#^root/##' | sort > ../results/fu_8-hcshd-reference-files.txt || true
+
+          # Preserve readable caller sources containing cmagent.send, mesh RPC or router/command.
+          mkdir -p ../results/caller-sources
+          while IFS= read -r p; do
+            [ -f "root/$p" ] || continue
+            case "$p" in
+              *.lua|*.htm|*.html|*.sh|etc/*|usr/lib/lua/*)
+                safe=$(echo "$p" | tr '/' '_')
+                cp "root/$p" "../results/caller-sources/$safe"
+                ;;
+            esac
+          done < <(
+            {
+              cat ../results/fu_8-cmagent-send-files.txt
+              find root/usr/lib/lua root/www -type f 2>/dev/null | sed 's#^root/##' | grep -E 'mesh|command|cmagent|rpc' || true
+            } | sort -u
+          )
+
+          # command.lua and related service handlers, whether source or bytecode.
+          find root -type f \( -name 'command.lua' -o -name '*cmagent*.lua' -o -name '*mesh*.lua' \) -print             | sed 's#^root/##' | sort > ../results/fu_8-command-handler-candidates.txt
+          while IFS= read -r p; do
+            [ -f "root/$p" ] || continue
+            safe=$(echo "$p" | tr '/' '_')
+            file "root/$p" > "../results/fu_8-$safe-file.txt"
+            sha256sum "root/$p" > "../results/fu_8-$safe-sha256.txt"
+            strings -a -n 3 "root/$p" > "../results/fu_8-$safe-strings.txt" || true
+          done < ../results/fu_8-command-handler-candidates.txt
+
+          # Deep static hcshd evidence.
+          H=root/usr/sbin/hcshd
+          test -f "$H"
+          sha256sum "$H" > ../results/fu_8-hcshd-sha256.txt
+          file "$H" > ../results/fu_8-hcshd-file.txt
+          strings -a -t x "$H" > ../results/fu_8-hcshd-strings-offsets.txt
+          readelf -hW "$H" > ../results/fu_8-hcshd-readelf-header.txt
+          readelf -lW "$H" > ../results/fu_8-hcshd-readelf-programheaders.txt
+          readelf -dW "$H" > ../results/fu_8-hcshd-readelf-dynamic.txt || true
+          readelf -sW "$H" > ../results/fu_8-hcshd-readelf-symbols.txt || true
+          readelf -rW "$H" > ../results/fu_8-hcshd-readelf-relocs.txt || true
+          mipsel-linux-gnu-objdump -D "$H" > ../results/fu_8-hcshd-objdump.txt || true
+          cp "$H" ../results/fu_8-hcshd.bin
+          cp root/usr/sbin/cmagent ../results/fu_8-cmagent.bin
+          cp root/usr/lib/lua/cmagent/router/command.lua ../results/fu_8-cmagent-router-command.lua
+          cp root/usr/lib/lua/luci/apprpc/mesh.lua ../results/fu_8-luci-apprpc-mesh.lua
+
+          # Observe only startup socket syscalls in an isolated runner. No packet is sent.
+          (
+            set +e
+            timeout 3s qemu-mipsel -strace -L "$PWD/root" "$H" > ../results/fu_8-hcshd-qemu-stdout.txt 2> ../results/fu_8-hcshd-qemu-strace.txt
+            echo "qemu_exit=$?" > ../results/fu_8-hcshd-qemu-exit.txt
+            ss -ulnp > ../results/fu_8-runner-udp-after-timeout.txt 2>&1 || true
+            set -e
+          )
+
+          # Extract public key text from hcshd without touching any private material.
+          python3 - <<'PY'
+          import re
+          d=open('root/usr/sbin/hcshd','rb').read()
+          m=re.search(br'-----BEGIN RSA PUBLIC KEY-----.*?-----END RSA PUBLIC KEY-----',d,re.S)
+          open('../results/fu_8-hcshd-embedded-public-key.pem','wb').write((m.group(0)+b'\n') if m else b'NOT_FOUND\n')
+          PY
+
+          # Network/API constants around hcshd + cmagent.
+          strings -a -n 3 root/usr/sbin/hcshd | grep -E '56791|socket|bind|recvfrom|sendto|RSA|cmd|error|port|addr'             > ../results/fu_8-hcshd-focused-strings.txt || true
+          strings -a -n 3 root/usr/sbin/cmagent | grep -Ei 'mqtt|ubus|router|command|127\.0\.0\.1|8883|1883|jwt|admin|socket|topic'             > ../results/fu_8-cmagent-focused-strings.txt || true
+
+          # Explicitly reconcile the old Dropbear-gate conflict using this exact retail image.
+          {
+            echo '=== exact /etc/init.d/dropbear from hash-verified retail 2.4.16 ==='
+            sha256sum root/etc/init.d/dropbear
+            grep -n -C 4 'bdinfo dbg' root/etc/init.d/dropbear || true
+            echo
+            echo '=== exact /etc/init.d/telnet ==='
+            sha256sum root/etc/init.d/telnet
+            grep -n -C 4 'bdinfo dbg' root/etc/init.d/telnet || true
+          } > ../results/fu_8-dropbear-telnet-gate-reconciliation.txt
+
+          # Compact machine-readable topology inventory.
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,hashlib
+          R=Path('root')
+          def sh(p):
+              q=R/p
+              return hashlib.sha256(q.read_bytes()).hexdigest() if q.is_file() else None
+          refs=Path('../results/fu_8-hcshd-reference-files.txt').read_text(errors='replace').splitlines()
+          cmrefs=Path('../results/fu_8-cmagent-send-files.txt').read_text(errors='replace').splitlines()
+          o={
+            'stock_sha256':'57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6',
+            'hcshd_sha256':sh(Path('usr/sbin/hcshd')),
+            'hcsh_init_sha256':sh(Path('etc/init.d/hcsh')),
+            'cmagent_sha256':sh(Path('usr/sbin/cmagent')),
+            'hcshd_reference_files':refs,
+            'cmagent_send_files':cmrefs,
+            'notes':[
+              'No absence claim should be made from binary-only grep alone.',
+              'A local hcshd reference list limited to init/config is evidence for an externally addressed service, not absolute proof of external caller identity.',
+              'cmagent command-plane and hcshd transport must be classified independently unless direct linkage is found.'
+            ]
+          }
+          Path('../results/fu_8-topology-inventory.json').write_text(json.dumps(o,indent=2,sort_keys=True))
+          PY
+
+          echo 'R25_2.4.16_CALLER_TOPOLOGY_STATIC_RE=PASS' > ../results/fu_8-result.txt
+          find ../results -type f -print0 | sort -z | xargs -0 sha256sum > ../results/fu_8-results-sha256.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fu_8-R25-2.4.16-CALLER-TOPOLOGY
+          path: fu_8-R25-2.4.16-CALLER-TOPOLOGY/results
+          compression-level: 6
+          include-hidden-files: true

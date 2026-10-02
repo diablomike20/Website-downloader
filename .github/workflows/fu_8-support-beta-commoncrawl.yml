@@ -1,0 +1,156 @@
+name: fu_8 support beta CommonCrawl exact residue
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_8-support-beta-commoncrawl.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Recover exact support-beta page snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p fu_8-SUPPORT-BETA-CC/evidence fu_8-SUPPORT-BETA-CC/recovered
+          python3 - <<'PY'
+          import gzip,io,json,os,re,hashlib,urllib.parse,urllib.request,time
+
+          OUT="fu_8-SUPPORT-BETA-CC"
+          UA="Mozilla/5.0 OpenCudy-FU8-SupportBeta-ExactCC"
+          needles={
+            "WR11000_2510b":"2.5.10b-20260624-151245",
+            "WR3000S_2516b":"2.5.16b",
+          }
+          pages=[
+            "https://www.cudy.com/blogs/news/cudy-software-platform-updates?page=6",
+            "https://www.cudy.com/blogs/news/cudy-software-platform-updates?page=10",
+            "https://www.cudy.com/blogs/news/cudy-software-platform-updates",
+            "https://www.cudy.com/en-gb/blogs/news/cudy-software-platform-updates",
+          ]
+
+          def get(url,timeout=45,headers=None):
+              h={"User-Agent":UA,"Accept":"*/*"}
+              if headers:h.update(headers)
+              req=urllib.request.Request(url,headers=h)
+              with urllib.request.urlopen(req,timeout=timeout) as r:
+                  return r.read(),r.status,dict(r.headers)
+
+          coll_raw,_,_=get("https://index.commoncrawl.org/collinfo.json",30)
+          cols=json.loads(coll_raw)
+          indexes=[x["id"] for x in cols if x.get("id","").startswith("CC-MAIN-2026-")]
+          open(f"{OUT}/fu_8-cc-indexes.json","w").write(json.dumps(indexes,indent=2))
+          print("INDEXES",indexes)
+
+          evidence=[]
+          urls=[]
+          def add_url(tag,u,source):
+              u=u.replace("&amp;","&").replace("\\u0026","&").strip()
+              if u.startswith("//"):u="https:"+u
+              if u.startswith("/"):u=urllib.parse.urljoin("https://www.cudy.com/",u)
+              if not u.startswith(("http://","https://")):return
+              key=(tag,u)
+              if key not in {(x["tag"],x["url"]) for x in urls}:
+                  urls.append({"tag":tag,"url":u,"source":source})
+
+          for idx in indexes:
+              for page in pages:
+                  q=urllib.parse.urlencode({"url":page,"output":"json"})
+                  try:
+                      b,_,_=get(f"https://index.commoncrawl.org/{idx}-index?{q}",25)
+                  except Exception as e:
+                      evidence.append({"index":idx,"page":page,"query_error":repr(e)})
+                      continue
+                  rows=[]
+                  for ln in b.decode("utf-8","replace").splitlines():
+                      try:o=json.loads(ln)
+                      except:continue
+                      if o.get("status")=="200" and all(o.get(k) for k in ("filename","offset","length")):
+                          rows.append(o)
+                  for ri,o in enumerate(rows,1):
+                      start=int(o["offset"]); end=start+int(o["length"])-1
+                      try:
+                          rawz,_,_=get("https://data.commoncrawl.org/"+o["filename"],50,{"Range":f"bytes={start}-{end}"})
+                      except Exception as e:
+                          evidence.append({"index":idx,"page":page,"digest":o.get("digest"),"warc_error":repr(e)})
+                          continue
+                      try: raw=gzip.decompress(rawz)
+                      except:
+                          try:raw=gzip.GzipFile(fileobj=io.BytesIO(rawz)).read()
+                          except:raw=rawz
+                      txt=raw.decode("utf-8","replace")
+                      low=txt.lower()
+                      for tag,needle in needles.items():
+                          if needle.lower() not in low: continue
+                          pos=low.find(needle.lower())
+                          frag=txt[max(0,pos-30000):pos+40000]
+                          fn=f"{OUT}/evidence/{tag}-{idx}-{ri}.txt"
+                          open(fn,"w",encoding="utf-8").write(frag)
+                          rec={"tag":tag,"needle":needle,"index":idx,"page":page,"digest":o.get("digest"),"timestamp":o.get("timestamp"),"evidence":fn}
+                          evidence.append(rec)
+                          # Exact URLs present near the known build string only.
+                          for m in re.finditer(r'(?i)(?:href|src)=["\']([^"\']+)["\']',frag):
+                              u=urllib.parse.urljoin(page,m.group(1))
+                              if any(x in u.lower() for x in ("cudy.com/cdn/shop/files","cdn.shopify.com","drive.google","mega.nz","dropbox","1drv.ms","onedrive")):
+                                  add_url(tag,u,f"{idx}:HREF")
+                          for m in re.finditer(r'(?i)https?://[^"\'<>\\s]+',frag):
+                              u=m.group(0)
+                              if any(x in u.lower() for x in ("cudy.com/cdn/shop/files","cdn.shopify.com","drive.google","mega.nz","dropbox","1drv.ms","onedrive")):
+                                  add_url(tag,u,f"{idx}:RAW")
+                          # Extract exact filename-like residues only if literally present.
+                          residues=sorted(set(re.findall(r'(?i)[A-Za-z0-9_+.-]{2,80}(?:2\\.5\\.10b-20260624-151245|2\\.5\\.16b)[A-Za-z0-9_+.-]{0,100}(?:\\.zip|\\.bin)?',frag)))
+                          if residues:
+                              rec["filename_residues"]=residues
+
+          # Do not guess filenames: attempt only literal URLs recovered above.
+          downloads=[]
+          for i,x in enumerate(urls,1):
+              u=x["url"]
+              try:
+                  data,st,h=get(u,90)
+                  sha=hashlib.sha256(data).hexdigest()
+                  ct=h.get("Content-Type","")
+                  htmlish=b"<html" in data[:2000].lower() or b"<!doctype" in data[:2000].lower()
+                  rec={**x,"status":st,"size":len(data),"sha256":sha,"content_type":ct,"htmlish":htmlish}
+                  if len(data)>500_000 and not htmlish and "text/html" not in ct.lower():
+                      cd=h.get("Content-Disposition","")
+                      mm=re.search(r'filename\\*?=(?:UTF-8\'\')?["\']?([^;"\']+)',cd,re.I)
+                      name=urllib.parse.unquote(mm.group(1).strip()) if mm else ""
+                      if not name:name=urllib.parse.unquote(urllib.parse.urlsplit(u).path.rsplit("/",1)[-1])
+                      name=re.sub(r'[^A-Za-z0-9._()+ -]+','_',name or (x["tag"]+"-"+sha[:12]+".bin"))
+                      out=f"{OUT}/recovered/{name}"
+                      open(out,"wb").write(data)
+                      rec["saved_as"]=out
+                  downloads.append(rec)
+              except Exception as e:
+                  downloads.append({**x,"error":repr(e)})
+
+          result={"indexes":indexes,"evidence":evidence,"literal_candidate_urls":urls,"downloads":downloads}
+          open(f"{OUT}/fu_8-SUPPORT-BETA-CC-RESULT.json","w",encoding="utf-8").write(json.dumps(result,indent=2,ensure_ascii=False))
+          with open(f"{OUT}/fu_8-SUPPORT-BETA-CC-SUMMARY.txt","w") as f:
+              f.write(f"indexes={len(indexes)}\n")
+              f.write(f"evidence_records={sum(1 for x in evidence if x.get('tag'))}\n")
+              f.write(f"literal_candidate_urls={len(urls)}\n")
+              f.write(f"saved_payloads={sum(1 for x in downloads if x.get('saved_as'))}\n")
+              for x in evidence:
+                  if x.get("tag"):
+                      f.write(json.dumps(x,ensure_ascii=False)+"\n")
+              for x in urls:
+                  f.write("URL "+json.dumps(x,ensure_ascii=False)+"\n")
+          print(open(f"{OUT}/fu_8-SUPPORT-BETA-CC-SUMMARY.txt").read())
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fu_8-SUPPORT-BETA-COMMONCRAWL
+          path: fu_8-SUPPORT-BETA-CC
+          compression-level: 6
+          include-hidden-files: true

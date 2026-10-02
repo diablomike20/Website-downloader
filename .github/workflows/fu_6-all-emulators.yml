@@ -1,0 +1,59 @@
+name: fu_6 ALL Cudy emulators full archive
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_6-all-emulators.yml"
+      - "cudy/**"
+      - "bin/cudy-forensic.js"
+      - "package.json"
+  pull_request:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/fu_6-all-emulators.yml"
+      - "cudy/**"
+      - "bin/cudy-forensic.js"
+      - "package.json"
+
+jobs:
+  all-emulators:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      - name: Capture every Cudy emulator including AC_Cloud
+        run: |
+          node bin/cudy-forensic.js \
+            --all \
+            --url https://support.cudy.com/ \
+            --output fu_6-CUDY-ALL-EMULATORS
+
+      - name: Summarize archive
+        run: |
+          echo "Models:"
+          cat fu_6-CUDY-ALL-EMULATORS/fu_6-models.json || true
+          echo "Total files:"
+          find fu_6-CUDY-ALL-EMULATORS -type f | wc -l
+          echo "Total bytes:"
+          du -sb fu_6-CUDY-ALL-EMULATORS
+          echo "AC_Cloud files:"
+          find fu_6-CUDY-ALL-EMULATORS/AC_Cloud -type f | wc -l || true
+          echo "Master routes:"
+          wc -l fu_6-CUDY-ALL-EMULATORS/fu_6-routes-master.txt || true
+          echo "Firmware/build strings:"
+          grep -RhoE '[0-9]+\.[0-9]+\.[0-9]+-20[0-9]{6}-[0-9]{6}' fu_6-CUDY-ALL-EMULATORS | sort -u || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fu_6-CUDY-ALL-EMULATORS
+          path: fu_6-CUDY-ALL-EMULATORS
+          compression-level: 6
+          include-hidden-files: true

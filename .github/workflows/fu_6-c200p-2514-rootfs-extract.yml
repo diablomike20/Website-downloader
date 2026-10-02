@@ -1,0 +1,103 @@
+name: fu_6 C200P 2.5.14 rootfs extract
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_6-c200p-2514-rootfs-extract.yml"
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install extraction tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y squashfs-tools file xz-utils unzip
+
+      - name: Download and verify exact firmware
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p fu_6-C200P-R74-2.5.14-unpacked
+          cd fu_6-C200P-R74-2.5.14-unpacked
+
+          URL="https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.14-20260618-150931-flash.zip"
+          curl -L --fail --retry 3 --retry-delay 2 -o fu_6-source.zip "$URL"
+
+          echo "a4f5f6494bcbdf41bfcd8573a22531fbd2115b5cb2769f5f44da213a900a7e98  fu_6-source.zip" | sha256sum -c -
+          unzip -o fu_6-source.zip -d fu_6-source
+
+          BIN="fu_6-source/C200P-R74-2.5.14-20260618-150931-flash.bin"
+          echo "8ba6c51d13d72d2871a1b5e8bbcb4318c2fd4234898f8c1e9e6c30502913e0e8  $BIN" | sha256sum -c -
+
+          SQUASH_OFF=$(grep -aob -m1 'hsqs' "$BIN" | cut -d: -f1)
+          UIMAGE_OFF=$((0x50000))
+          TRAILER_OFF=$((0xC90000))
+
+          if [ -z "$SQUASH_OFF" ]; then
+            echo "SquashFS magic not found" >&2
+            exit 1
+          fi
+
+          echo "BIN=$BIN" > fu_6-layout.txt
+          echo "BIN_BYTES=$(stat -c %s "$BIN")" >> fu_6-layout.txt
+          printf 'UIMAGE_OFFSET_DEC=%d\nUIMAGE_OFFSET_HEX=0x%X\n' "$UIMAGE_OFF" "$UIMAGE_OFF" >> fu_6-layout.txt
+          printf 'SQUASHFS_OFFSET_DEC=%d\nSQUASHFS_OFFSET_HEX=0x%X\n' "$SQUASH_OFF" "$SQUASH_OFF" >> fu_6-layout.txt
+          printf 'TRAILER_OFFSET_DEC=%d\nTRAILER_OFFSET_HEX=0x%X\n' "$TRAILER_OFF" "$TRAILER_OFF" >> fu_6-layout.txt
+
+          mkdir -p fu_6-components
+
+          # Prefix / vendor header area before the uImage.
+          dd if="$BIN" of=fu_6-components/fu_6-prefix-before-uimage.bin bs=1 count="$UIMAGE_OFF" status=none
+
+          # uImage/kernel region up to SquashFS.
+          dd if="$BIN" of=fu_6-components/fu_6-kernel-uimage-region.bin bs=1 skip="$UIMAGE_OFF" count=$((SQUASH_OFF-UIMAGE_OFF)) status=none
+
+          # Read exact SquashFS bytes_used from the v4 superblock (little endian, offset 40)
+          # so the extracted filesystem image does not include fwtool/trailer bytes.
+          FS_SIZE=$(python3 -c 'import struct,sys; p=sys.argv[1]; off=int(sys.argv[2]); f=open(p,"rb"); f.seek(off+40); print(struct.unpack("<Q",f.read(8))[0])' "$BIN" "$SQUASH_OFF")
+          echo "SQUASHFS_BYTES_USED=$FS_SIZE" >> fu_6-layout.txt
+
+          dd if="$BIN" of=fu_6-components/fu_6-rootfs.squashfs bs=1 skip="$SQUASH_OFF" count="$FS_SIZE" status=none
+
+          # Known fwtool/trailer region from the live layout correlation.
+          dd if="$BIN" of=fu_6-components/fu_6-fwtool-trailer.bin bs=1 skip="$TRAILER_OFF" status=none
+
+          unsquashfs -s fu_6-components/fu_6-rootfs.squashfs | tee fu_6-squashfs-superblock.txt
+          sudo rm -rf fu_6-rootfs
+          sudo unsquashfs -f -d fu_6-rootfs fu_6-components/fu_6-rootfs.squashfs
+
+          # Preserve symlinks, numeric ownership, modes and device nodes inside tar.
+          sudo tar --numeric-owner -czf fu_6-C200P-R74-2.5.14-rootfs.tar.gz fu_6-rootfs
+          sudo chown "$(id -u):$(id -g)" fu_6-C200P-R74-2.5.14-rootfs.tar.gz
+
+          sha256sum fu_6-source.zip "$BIN" fu_6-components/* fu_6-C200P-R74-2.5.14-rootfs.tar.gz             | tee fu_6-sha256sums.txt
+
+          {
+            echo "=== file types ==="
+            file fu_6-source.zip "$BIN" fu_6-components/*
+            echo
+            echo "=== rootfs top level ==="
+            sudo find fu_6-rootfs -maxdepth 2 -printf '%y %p -> %l\n' | sort | head -500
+            echo
+            echo "=== selected identity strings ==="
+            sudo grep -RIna -m20 -E '2\.5\.14-20260618-150931|C200P|R74' fu_6-rootfs/etc fu_6-rootfs/usr 2>/dev/null || true
+          } | tee fu_6-unpack-report.txt
+
+          # The tarball is the faithful rootfs export, including special device nodes.
+          # Remove the expanded rootfs before artifact upload because upload-artifact
+          # only handles regular filesystem entries reliably.
+          sudo rm -rf fu_6-rootfs
+
+          # Remove duplicate original ZIP/BIN from the final unpack package; checksums/layout remain.
+          rm -rf fu_6-source fu_6-source.zip
+
+      - name: Upload unpacked firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: fu_6-C200P-R74-2.5.14-20260618-150931-UNPACKED
+          path: fu_6-C200P-R74-2.5.14-unpacked
+          compression-level: 0
+          include-hidden-files: true

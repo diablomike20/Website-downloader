@@ -1,0 +1,48 @@
+name: fu_6 AC Cloud mock-path probe
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_6-ac-cloud-mock-probe.yml"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe public AC_Cloud static mock API
+        shell: bash
+        run: |
+          set -u
+          BASE="https://support.cudy.com/emulator/AC_Cloud/mock_api/web/"
+          DEVID="2040182040-CEF9C206170F0031"
+          urls=(
+            "${BASE}v1/device/list.json"
+            "${BASE}v1/device/system/info__devid_${DEVID}.json"
+            "${BASE}v1/device/ac/stat__devid_${DEVID}.json"
+            "${BASE}v1/device/poe/status__devid_${DEVID}.json"
+            "${BASE}v1/device/ac/ap/list__devid_${DEVID}.json"
+            "${BASE}v1/device/ac/ap/info__devid_${DEVID}.json"
+            "${BASE}v1/device/ac/upgrade/check.json"
+            "${BASE}v1/device/ac/upgrade/check__devid_${DEVID}.json"
+            "${BASE}v1/device/ac/ap/upgrade/get__devid_${DEVID}.json"
+            "${BASE}v1/device/ac/ap/upgrade/list__devid_${DEVID}.json"
+            "${BASE}v1/device/ac/ap/upgrade/list__devid_${DEVID}__filter_auto_upgrade_1.json"
+            "${BASE}v1/device/ac/ap/upgrade/list__devid_${DEVID}__filter_auto_upgrade_0.json"
+            "${BASE}v1/device/ac/ap/list__devid_${DEVID}__filter_status_Online_Offline_Offline_upgrading_Online_upgrading.json"
+            "${BASE}v1/device/ac/client/list__devid_${DEVID}.json"
+            "${BASE}v1/device/net/pingcheck/get__devid_${DEVID}.json"
+          )
+          for url in "${urls[@]}"; do
+            echo "=== $url ==="
+            code=$(curl -L -sS -o /tmp/body -w "%{http_code}" "$url" || true)
+            echo "HTTP $code"
+            wc -c /tmp/body || true
+            if [ "$code" = "200" ]; then
+              cat /tmp/body
+            else
+              head -c 300 /tmp/body || true
+            fi
+            echo
+          done

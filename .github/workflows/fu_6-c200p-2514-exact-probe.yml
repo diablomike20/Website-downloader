@@ -1,0 +1,39 @@
+name: fu_6 C200P 2.5.14 exact artifact probe
+
+on:
+  push:
+    branches:
+      - fu_6-cudy-forensic
+    paths:
+      - ".github/workflows/fu_6-c200p-2514-exact-probe.yml"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe exact first-party candidate paths only
+        shell: bash
+        run: |
+          set -u
+          urls=(
+            "https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.14-20260618-150931-flash.zip"
+            "https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.14-20260618-150931-flash.bin"
+            "https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.14-20260618-150931.zip"
+            "https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.14-20260618-150931.bin"
+            "https://support.cudy.com/C200P-R74-2.5.14-20260618-150931-flash.zip"
+            "https://support.cudy.com/firmware/C200P-R74-2.5.14-20260618-150931-flash.zip"
+          )
+          for url in "${urls[@]}"; do
+            echo "=== $url ==="
+            rm -f /tmp/body /tmp/headers
+            code=$(curl -L -sS --max-time 30 -D /tmp/headers -o /tmp/body -w "%{http_code}" "$url" || true)
+            echo "HTTP $code"
+            grep -Ei '^(content-type|content-length|location|etag|last-modified):' /tmp/headers | tail -20 || true
+            if [ -f /tmp/body ]; then
+              echo "BYTES $(wc -c < /tmp/body)"
+              sha256sum /tmp/body || true
+              file /tmp/body || true
+              od -An -tx1 -N32 /tmp/body || true
+            fi
+            echo
+          done
