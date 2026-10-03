@@ -1,0 +1,138 @@
+name: FU9 Cudy firmware handoff bundle
+
+on:
+  push:
+    branches:
+      - fu_9-handoff
+    paths:
+      - ".github/workflows/fu_9-cudy-firmware-bundle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq unzip zip jq file >/dev/null
+
+      - name: Gather FU7 exact firmware corpus
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/FU7-CLEAN out/FU7-INTERMEDIARY work
+
+          gh api /repos/${GITHUB_REPOSITORY}/actions/artifacts/11068611598/zip > work/fu7-clean.zip
+          unzip -q work/fu7-clean.zip -d work/fu7-clean
+          find work/fu7-clean -type f \( -iname '*.bin' -o -iname '*.img' -o -iname '*.trx' -o -iname '*.ubi' \) -print0 |
+            while IFS= read -r -d '' f; do
+              base="$(basename "$f")"
+              cp -f "$f" "out/FU7-CLEAN/$base"
+            done
+
+          gh api /repos/${GITHUB_REPOSITORY}/actions/artifacts/11067574831/zip > work/fu7-intermediary.zip
+          unzip -q work/fu7-intermediary.zip -d work/fu7-intermediary
+          find work/fu7-intermediary -type f \( -iname '*.bin' -o -iname '*.img' -o -iname '*.trx' -o -iname '*.ubi' \) -print0 |
+            while IFS= read -r -d '' f; do
+              base="$(basename "$f")"
+              cp -f "$f" "out/FU7-INTERMEDIARY/$base"
+            done
+
+      - name: Gather exact first-party Cudy donors
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/FIRST-PARTY-CUDY
+          cd out/FIRST-PARTY-CUDY
+
+          get() {
+            url="$1"; name="$2"
+            echo "Downloading $name"
+            curl -L --fail --retry 4 --retry-delay 2 --connect-timeout 25 -o "$name" "$url"
+          }
+
+          get "https://d1jvyy13vm72kv.cloudfront.net/device/upgrade/upgrade_LT500V2-R25-2.4.16-20250804-150319-flash_20729.bin"               "LT500V2-R25-2.4.16-20250804-150319-flash.bin"
+          echo "57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6  LT500V2-R25-2.4.16-20250804-150319-flash.bin" | sha256sum -c -
+
+          for spec in             "WR1200V2-R26-1.17.4-20240206-085058-flash.zip|https://www.cudy.com/cdn/shop/files/WR1200V2-R26-1.17.4-20240206-085058-flash.zip"             "WR1200V2-R26-2.1.1-20240418-092852-flash.zip|https://www.cudy.com/cdn/shop/files/WR1200V2-R26-2.1.1-20240418-092852-flash.zip"             "WR1200V2-R26-2.2.8-20241015-160718-flash.zip|https://www.cudy.com/cdn/shop/files/WR1200V2-R26-2.2.8-20241015-160718-flash.zip"             "WR1200V2-R26-2.4.12-20250703-144919-flash.zip|https://www.cudy.com/cdn/shop/files/WR1200V2-R26-2.4.12-20250703-144919-flash.zip"             "WR1200V2-R26-2.4.23-20251224-145945-flash.zip|https://www.cudy.com/cdn/shop/files/WR1200V2-R26-2.4.23-20251224-145945-flash.zip"             "WR1300-R10-1.13.6-20220314-112409-flash_1.zip|https://www.cudy.com/cdn/shop/files/WR1300-R10-1.13.6-20220314-112409-flash_1.zip"             "WR2100-R11-1.14.25-20220730-212246-flash.zip|https://www.cudy.com/cdn/shop/files/WR2100-R11-1.14.25-20220730-212246-flash.zip"             "C200P-R74-2.5.14-20260618-150931-flash.zip|https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.14-20260618-150931-flash.zip"             "C200P-R74-2.5.15-20260629-160214-flash.zip|https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.15-20260629-160214-flash.zip"             "P2-R91-2.4.29-20260421-190344-sysupgrade.zip|https://www.cudy.com/cdn/shop/files/P2-R91-2.4.29-20260421-190344-sysupgrade.zip"
+          do
+            name="${spec%%|*}"; url="${spec#*|}"
+            get "$url" "$name"
+            d="unpacked-${name%.zip}"
+            mkdir -p "$d"
+            unzip -q "$name" -d "$d"
+            find "$d" -type f -name '*.bin' -exec cp -f {} . \;
+          done
+
+          echo "a4f5f6494bcbdf41bfcd8573a22531fbd2115b5cb2769f5f44da213a900a7e98  C200P-R74-2.5.14-20260618-150931-flash.zip" | sha256sum -c -
+          echo "04fe2d3d59de6ee4e66e56fea010038ea033feac50e418148ee2528f5e08ed56  C200P-R74-2.5.15-20260629-160214-flash.zip" | sha256sum -c -
+          echo "610a783202e1768156b5b9368de8a136565f4186f18bca88ea4c2144819658ab  P2-R91-2.4.29-20260421-190344-sysupgrade.zip" | sha256sum -c -
+
+          rm -rf unpacked-*
+
+      - name: Create exact manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "Firmware Unlock 9 - Cudy firmware bundle"
+            echo "Generated: $(date -u +%FT%TZ)"
+            echo
+            echo "WARNING:"
+            echo "Presence in this bundle does NOT mean target compatibility or flash approval."
+            echo "Cross-model donor firmware must never be flashed to R25 or Belkin."
+            echo "Candidate/revoked status is defined in the FU9 documentation."
+            echo
+            echo "Known exact artifacts unavailable as raw bytes in this workflow are listed in MISSING-KNOWN.txt."
+          } > out/README-FIRMWARE-BUNDLE.txt
+
+          cat > out/MISSING-KNOWN.txt <<'EOF'
+Known project firmware/artifacts not guaranteed to be materialized in this reproducible bundle:
+- LT300V3-R100-2.5.12-20260518-234632 donor package (package SHA 8cd02de01b9db1caff6046d65768c9ce6f2c8db0913f6f7faa831971b5e46653; inner SHA 03641ed863911618155ddb55ed2c45f4c23abd330a4e171bff4491ffcda49a82) unless already present inside FU7 corpus.
+- RE-LT500V2-R25-ENG06-sysupgrade.bin SHA f9a9d8ae1419df115804fcafc752de45f3cd240c3652fe1f24aa4b935d3408b8 unless archived in FU7 corpus.
+- RE-OPEN-CUDY-LT500V2-R25-C27-SYSUPGRADE-CANDIDATE-47.bin SHA 8d51bc017a3e275c0ce3a5c05a659a4a3c4f55bb96370d0fabc81f3d1470a060 unless archived in FU7 corpus.
+- RE-OPEN-CUDY-LT500V2-R25-C27-FULLFLASH-CANDIDATE-47.bin SHA 7118cfd798da459fc7d5ea0350501ec4a5bd088e0449d953dabf15929f89694f unless archived in FU7 corpus.
+- RE-R100-R25-CSP25-SYSUPGRADE-CANDIDATE-02.bin SHA 47290d1c168c7991decdbedfdf1a12821a5fe9df237b1510960c00eac5311a52 (REVOKED/SUPERSEDED) unless archived in FU7 corpus.
+EOF
+
+          find out -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > out/SHA256SUMS.txt
+          {
+            echo 'path,size_bytes,sha256'
+            while IFS= read -r line; do
+              hash="${line%% *}"
+              path="${line#*  }"
+              size=$(stat -c '%s' "$path")
+              printf '"%s",%s,%s\n' "${path#out/}" "$size" "$hash"
+            done < out/SHA256SUMS.txt
+          } > out/FIRMWARE-MANIFEST.csv
+
+      - name: Package and publish public handoff release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd out && zip -9 -r ../Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.zip .)
+          sha256sum Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.zip > Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.zip.sha256
+          unzip -t Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.zip > Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.ziptest.txt
+
+          gh release delete fu9-cudy-firmware-handoff --cleanup-tag -y >/dev/null 2>&1 || true
+          gh release create fu9-cudy-firmware-handoff             Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.zip             Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.zip.sha256             Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.ziptest.txt             --title "Firmware Unlock 9 Cudy firmware handoff bundle"             --notes "Reproducible Cudy/FU7 donor firmware bundle for the Firmware Unlock 9 successor handoff. Presence is not flash approval."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE
+          path: |
+            Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.zip
+            Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.zip.sha256
+            Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.ziptest.txt
+          compression-level: 0
