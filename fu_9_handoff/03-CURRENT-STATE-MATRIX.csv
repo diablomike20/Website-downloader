@@ -1,0 +1,31 @@
+AREA,ITEM,STATE,EVIDENCE,DO_NEXT,DO_NOT_CLAIM
+Priority,Belkin F9K1103 native LEDE 17.01.5,P0_ACTIVE,User explicit decision 2026-10-02; repo source; latest run 36959975523,Fix current objcopy blocker then build/static validation,Do not start Cudy UI port first
+Belkin,Physical device identity,F9K1103_V1,User correction + project board evidence,Preserve target-specific board truth,Do not call it F9K1109 hardware
+Belkin,Currently working OpenWrt image,F9K1109_V1_19.07.0_REFERENCE,User uploaded actual image; SHA b5bf1e...,Keep as known-good hardware reference,Do not call it native F9K1103 build
+Belkin,Native LEDE source,PORT_WIP,Own DTS/build script in Belkin repo,Continue build,Do not call boot verified
+Belkin,Old PLATFORM loader error,RESOLVED_IN_LATEST_RUN,Latest log builds board-ralink.o,Do not reopen unless regression,Do not treat as current blocker
+Belkin,Current loader objcopy failure,OPEN_P0,run 36959975523 job 110691296857,Capture ELF sections and minimally patch loader pipeline,Do not claim LEDE build success
+Belkin,Physical LEDE boot,TARGET_REQUIRED,No successful native LEDE artifact/boot evidence,Only explicit user test after static pass,Do not call target verified
+Belkin,Cudy userspace port,PARKED,User decision,Start only after native LEDE success,Do not merge now
+R25,Stock firmware,R25_SOURCE_VERIFIED,2.4.16 stock SHA 57aed945...,Preserve canonical baseline,Do not replace with donor truth
+R25,4G usb0,TARGET_VERIFIED,EC200A-EL cdc_ether network.4g,Regression-protect,Do not rewrite from P2 donor
+R25,C27 cumulative runtime,TARGET_VERIFIED_LINEAGE,C27 target checks,Keep as proven runtime lineage,Do not call final flash release
+R25,Candidate47 format,TARGET_VERIFIED_FORMAT_ONLY,GUI acceptance + sysupgrade -T,Physical boot only explicit user choice,Do not call booted
+R25,OPKG H09,LIFECYCLE_VERIFIED,Install-upgrade-remove lifecycle,Frozen subsystem,Do not refactor without regression
+R25,H11 branding,PARTIAL_TARGET_OBSERVED,Dark theme works; three branding misses,Fix later,Do not call visual parity complete
+R25,Developer V4 CLEAN,PROVEN_BRANCH,Developer lineage evidence,Preserve ownership rules,Do not move normal features into Developer
+R25,Factory debug algorithm,R25_STATIC_VERIFIED,Exact libbdinfo reverse engineering,Use architecture evidence only,Do not write bdinfo
+R25,hcshd upstream sender,UNKNOWN,CP13/14,Static provenance only if R25 line resumes,Do not invent sender
+R25,bdinfo_check_uuid algorithm,OPEN_STATIC_RE,Separate from dbg,Resume later,Do not infer from C200P
+R25,Exact CSP2.5 firmware,UNKNOWN_NOT_FOUND,Extensive hunt,Only evidence-derived exact leads,No brute force
+C200P,2.5.14 internal/unlisted firmware,SOURCE_VERIFIED,a4f5... outer 8ba6... inner,Keep donor reference,Do not call R25 firmware
+C200P,2.5.15 public successor,SOURCE_VERIFIED,Exact capture/rootfs diff,Use delta reference,Do not copy support credential formula to R25
+P2,2.4.22 to 2.4.29 lifecycle delta,STATIC_VERIFIED,CP09 exact rootfs diff,Use as cellular architecture donor,Do not transplant blindly
+P2,2.4.29b Vodafone branch,STATIC_VERIFIED,Adjacent diff,Keep separate from public general recovery fix,Do not merge fix narratives
+Management,LuCI/cmagent/cmsd/hcshd separation,R25_SOURCE_VERIFIED,CP11-14,Preserve separate trust boundaries,Do not describe one linear backdoor
+Management,MQTT WAN default,STATIC_POLICY_BLOCKED,Stock firewall WAN INPUT REJECT,Runtime measure only if needed,Do not infer WAN exposure from bind address
+Management,cmagent internal callers,SOURCE_VERIFIED,sync_command/sync_config/mesh paths,Preserve legitimate dependencies,Do not expose raw command API
+OpenWrt23,V69 donor-fidelity branch,HISTORICAL_MATURE_LINEAGE,Truth-04 SHA e8e2...,Preserve separate from physical C27,Do not merge evidence labels
+Safety,TR-069,CURRENT_POLICY_EXCLUDED,Explicit project policy,Keep excluded,Do not restore
+Safety,bdinfo writes,FORBIDDEN_BY_PROJECT,Explicit repeated constraint,None,Do not perform
+Safety,random OTA enumeration,DO_NOT_REPEAT,Probe97 and hunt closed areas,Use exact evidence only,No timestamp/UUID/suffix spray
