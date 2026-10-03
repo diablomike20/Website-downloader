@@ -1,0 +1,1000 @@
+\n================================================================
+IDENTITY
+================================================================
+generated=Fri Sep 25 01:07:58 CEST 2026
+hostname=
+uname=Linux LT500D 4.4.140 #0 Mon Aug 4 06:55:57 2025 mips GNU/Linux
+[/etc/openwrt_release]
+DISTRIB_ID='LEDE'
+DISTRIB_RELEASE='17.01.5'
+DISTRIB_REVISION='2.4.16'
+DISTRIB_CODENAME='openwrt'
+DISTRIB_TARGET='ramips/mt7628'
+DISTRIB_ARCH='mipsel_24kc'
+DISTRIB_DESCRIPTION='LEDE OpenWrt 17.01.5 2.4.16'
+DISTRIB_TAINTS='no-all busybox override'
+\n================================================================
+UPTIME / LOAD
+================================================================
+\n### cat /proc/uptime
+161276.23 122105.96
+\n### cat /proc/loadavg
+0.23 0.32 0.34 1/69 6572
+\n================================================================
+CPU
+================================================================
+system type		: MediaTek MT7628AN ver:1 eco:2
+machine			: R25
+processor		: 0
+cpu model		: MIPS 24KEc V5.5
+BogoMIPS		: 385.84
+wait instruction	: yes
+microsecond timers	: yes
+tlb_entries		: 32
+extra interrupt vector	: yes
+hardware watchpoint	: yes, count: 4, address/irw mask: [0x0ffc, 0x0ffc, 0x0ffb, 0x0ffb]
+isa			: mips1 mips2 mips32r1 mips32r2
+ASEs implemented	: mips16 dsp
+shadow register sets	: 1
+kscratch registers	: 0
+package			: 0
+core			: 0
+VCED exceptions		: not available
+VCEI exceptions		: not available
+
+\n================================================================
+MEMORY / SWAP / ZRAM
+================================================================
+MemTotal:         122720 kB
+MemFree:           59628 kB
+MemAvailable:      65332 kB
+Buffers:            4904 kB
+Cached:            11488 kB
+SwapCached:          600 kB
+Active:            17992 kB
+Inactive:           3668 kB
+Active(anon):       4916 kB
+Inactive(anon):     1072 kB
+Active(file):      13076 kB
+Inactive(file):     2596 kB
+Unevictable:           0 kB
+Mlocked:               0 kB
+SwapTotal:         60412 kB
+SwapFree:          58528 kB
+Dirty:                 0 kB
+Writeback:             0 kB
+AnonPages:          4836 kB
+Mapped:             4220 kB
+Shmem:               720 kB
+Slab:              12252 kB
+SReclaimable:       2592 kB
+SUnreclaim:         9660 kB
+KernelStack:         552 kB
+PageTables:          464 kB
+NFS_Unstable:          0 kB
+Bounce:                0 kB
+WritebackTmp:          0 kB
+CommitLimit:      121772 kB
+Committed_AS:      12564 kB
+VmallocTotal:    1048372 kB
+VmallocUsed:           0 kB
+VmallocChunk:          0 kB
+\n### free
+             total       used       free     shared    buffers     cached
+Mem:        122720      63092      59628        720       4904      11492
+-/+ buffers/cache:      46696      76024
+Swap:        60412       1884      58528
+\n### swapon -s
+Filename				Type		Size	Used	Priority
+/dev/zram0                              partition	60412	1884	-1
+\n[/sys/block/zram0]
+disksize=61865984
+compr_data_size=623677
+orig_data_size=1921024
+mem_used_total=1441792
+num_reads=22311
+num_writes=35228
+\n================================================================
+FILESYSTEM / OVERLAY / JFFS2
+================================================================
+\n### mount
+/dev/root on /rom type squashfs (ro,relatime)
+proc on /proc type proc (rw,nosuid,nodev,noexec,noatime)
+sysfs on /sys type sysfs (rw,nosuid,nodev,noexec,noatime)
+tmpfs on /tmp type tmpfs (rw,nosuid,nodev,noatime)
+tmpfs on /tmp/root type tmpfs (rw,noatime,mode=755)
+tmpfs on /dev type tmpfs (rw,nosuid,relatime,size=512k,mode=755)
+devpts on /dev/pts type devpts (rw,nosuid,noexec,relatime,mode=600)
+binfmt_misc on /proc/sys/fs/binfmt_misc type binfmt_misc (rw,relatime)
+debugfs on /sys/kernel/debug type debugfs (rw,noatime)
+/dev/mtdblock9 on /overlay type jffs2 (rw,noatime)
+overlayfs:/overlay on / type overlay (rw,noatime,lowerdir=/,upperdir=/overlay/upper,workdir=/overlay/work)
+\n### df -k
+Filesystem           1K-blocks      Used Available Use% Mounted on
+/dev/root                 8704      8704         0 100% /rom
+tmpfs                    61360      1084     60276   2% /tmp
+tmpfs                    61360       228     61132   0% /tmp/root
+tmpfs                      512         0       512   0% /dev
+/dev/mtdblock9            4736       864      3872  18% /overlay
+overlayfs:/overlay        4736       864      3872  18% /
+\n### df -i
+df: unrecognized option: i
+BusyBox v1.25.1 () multi-call binary.
+
+Usage: df [-PkmhT] [FILESYSTEM]...
+
+Print filesystem usage statistics
+
+	-P	POSIX output format
+	-k	1024-byte blocks (default)
+	-m	1M-byte blocks
+	-h	Human readable (e.g. 1K 243M 2G)
+	-T	Print filesystem type
+[command-failed:1] df -i
+\n[/proc/mtd]
+dev:    size   erasesize  name
+mtd0: 00030000 00010000 "u-boot"
+mtd1: 00010000 00010000 "u-boot-env"
+mtd2: 00010000 00010000 "factory"
+mtd3: 00010000 00010000 "debug"
+mtd4: 00010000 00010000 "backup"
+mtd5: 00010000 00010000 "bdinfo"
+mtd6: 00f80000 00010000 "firmware"
+mtd7: 00257d4d 00010000 "kernel"
+mtd8: 00d282b3 00010000 "rootfs"
+mtd9: 004a0000 00010000 "rootfs_data"
+\n[dmesg overlay/jffs2/drop_caches]
+[    0.000000] Kernel command line: console=ttyS0,115200 rootfstype=squashfs,jffs2
+[    1.006210] jffs2: version 2.2 (NAND) (SUMMARY) (LZMA) (RTIME) (CMODE_PRIORITY) (c) 2001-2006 Red Hat, Inc.
+[    1.229925] 0x000000b30000-0x000000fd0000 : "rootfs_data"
+[    8.837575] mount_root: loading kmods from internal overlay
+[    9.644507] mount_root: no usable overlay filesystem found, using tmpfs overlay
+[  101.610134] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00000000: 0xbc64 instead
+[  101.637314] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00000004: 0xbb61 instead
+[  101.646980] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00000008: 0x03b8 instead
+[  101.676098] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x0000000c: 0x2a54 instead
+[  101.698302] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00000010: 0x9142 instead
+[  101.717637] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00000014: 0x842b instead
+[  101.737629] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00000018: 0x76e3 instead
+[  101.755775] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x0000001c: 0x0557 instead
+[  101.775324] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00000020: 0xb4e4 instead
+[  101.807427] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00000024: 0x67cc instead
+[  101.817149] jffs2: Further such events for this erase block will not be printed
+[  102.083779] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00010000: 0xea13 instead
+[  102.105242] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00010004: 0x1983 instead
+[  102.127391] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00010008: 0x5080 instead
+[  102.148903] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x0001000c: 0x290d instead
+[  102.329973] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00010010: 0x0e4f instead
+[  102.350785] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00010014: 0x6477 instead
+[  102.376700] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00010018: 0x77f9 instead
+[  102.392575] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x0001001c: 0x85eb instead
+[  102.415451] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00010020: 0x46d1 instead
+[  102.442222] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00010024: 0x36c5 instead
+[  102.451923] jffs2: Further such events for this erase block will not be printed
+[  102.566587] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00020000: 0x85ea instead
+[  102.576336] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00020004: 0x05b5 instead
+[  102.586303] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00020008: 0xdf47 instead
+[  102.596096] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x0002000c: 0xb234 instead
+[  102.605897] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00020010: 0xc68d instead
+[  102.624656] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00020014: 0x1e89 instead
+[  102.642395] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00020018: 0xa76b instead
+[  102.677389] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x0002001c: 0xf25c instead
+[  102.687070] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00020020: 0x5e93 instead
+[  102.726260] jffs2: jffs2_scan_eraseblock(): Magic bitmask 0x1985 not found at 0x00020024: 0x0cc3 instead
+[  102.735953] jffs2: Further such events for this erase block will not be printed
+[  102.898568] jffs2: Empty flash at 0x0002a704 ends at 0x0002b000
+[  102.909323] jffs2: Empty flash at 0x0002b004 ends at 0x0002c000
+[  103.065099] jffs2_scan_eraseblock(): End of filesystem marker found at 0x40000
+[  103.082718] jffs2_build_filesystem(): unlocking the mtd device... done.
+[  103.089559] jffs2_build_filesystem(): erasing all blocks after the end marker... 
+[  112.163717] jffs2: notice: (4122) jffs2_build_xattr_subsystem: complete building xattr subsystem, 0 of xdatum (0 unchecked, 0 orphan) and 0 of xref (0 dead, 0 orphan) found.
+[  114.064825] S95done (4099): drop_caches: 3
+[91085.784650] sh (32619): drop_caches: 3
+[91165.398691] sh (1726): drop_caches: 3
+\n================================================================
+PROCESS TABLE
+================================================================
+\n### ps w
+  PID USER       VSZ STAT COMMAND
+    1 root      1544 S    /sbin/procd
+    2 root         0 SW   [kthreadd]
+    3 root         0 SW   [ksoftirqd/0]
+    4 root         0 SW   [kworker/0:0]
+    5 root         0 SW<  [kworker/0:0H]
+    7 root         0 SW<  [writeback]
+   74 root         0 SW<  [crypto]
+   75 root         0 SW<  [bioset]
+   77 root         0 SW<  [kblockd]
+  107 root         0 SW   [kworker/0:1]
+  115 root         0 SW   [kswapd0]
+  168 root         0 SW   [fsnotify_mark]
+  198 root         0 SW   [spi32766]
+  202 root         0 SW<  [bioset]
+  207 root         0 SW<  [bioset]
+  212 root         0 SW<  [bioset]
+  217 root         0 SW<  [bioset]
+  222 root         0 SW<  [bioset]
+  227 root         0 SW<  [bioset]
+  232 root         0 SW<  [bioset]
+  237 root         0 SW<  [bioset]
+  242 root         0 SW<  [bioset]
+  247 root         0 SW<  [bioset]
+  273 root         0 SW<  [ipv6_addrconf]
+  279 root         0 SW<  [deferwq]
+  282 root         0 SW<  [kworker/0:1H]
+  418 root      1188 S    /sbin/ubusd
+  424 root       892 S    /sbin/askfirst /usr/libexec/login.sh
+  566 root         0 SW<  [bioset]
+  970 root         0 SW   [RtmpCmdQTask]
+  971 root         0 SW   [RtmpWscTask]
+  972 root         0 SW   [RtmpMlmeTask]
+ 1019 root         0 SW   [RtmpCmdQTask]
+ 1046 root         0 SW   [RtmpWscTask]
+ 1047 root         0 SW   [HwCtrlTask]
+ 1048 root         0 SW   [ser_task]
+ 1049 root         0 SW   [RtmpMlmeTask]
+ 2247 root      1440 S    /sbin/rpcd
+ 2262 root      3676 S    /usr/sbin/softapd
+ 2297 root      1300 S    /usr/sbin/hyfibrd
+ 2468 root      1684 S    /sbin/netifd
+ 2617 root      3820 S    /usr/bin/gcom
+ 3429 dnsmasq   1628 S    /usr/sbin/dnsmasq -C /var/etc/dnsmasq.conf.cfg02411c -k -x /var/run/dnsmasq/dnsmasq.cfg02411c.pid
+ 3455 root      1188 S    /usr/sbin/crond -f -c /etc/crontabs -l 5
+ 3812 root      1060 S    /usr/sbin/dropbear -F -P /var/run/dropbear.1.pid -p 22 -K 300 -T 3
+ 3911 mosquitt  3316 S    mosquitto -c /etc/mosquitto/mosquitto.conf
+ 3928 root      3068 S    /usr/sbin/umdns
+ 4285 root         0 SWN  [jffs2_gcd_mtd9]
+ 4426 root      1424 S    /usr/sbin/odhcpd
+ 4448 root      1324 S    /usr/sbin/pingcheck
+ 6561 root      1184 S    sleep 5
+ 6562 root      1192 S    sh RE-PERFORMANCE-PROBE-01.sh
+ 6589 root      1184 R    ps w
+ 6889 root      4144 S    /usr/sbin/cmagent -m router -b 127.0.0.1 -p 8883 -a -t 30
+ 7175 root      1184 S <  /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug -p time.windows.com -p time.nist.gov -p time-nw.nist.gov -
+ 7176 root      1184 S <  /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug -p 0.openwrt.pool.ntp.org -p 1.openwrt.pool.ntp.org -p 2.o
+ 9264 root      1424 S    /bin/sh /usr/lib/4g/4gup.sh 4g
+ 9991 root         0 SW   [kworker/u2:0]
+10711 root      3512 S    /usr/sbin/uhttpd -f -h /www -r LT500D -x /cgi-bin -u /ubus -t 60 -T 30 -k 20 -A 1 -n 3 -N 100 -p 0.0.0.0:
+20417 root      1128 S    /usr/sbin/dropbear -F -P /var/run/dropbear.1.pid -p 22 -K 300 -T 3
+20418 root      1184 S    ash -c /usr/libexec/sftp-server
+20419 root      1020 S    /usr/libexec/sftp-server
+22391 root      1184 S    udhcpc -p /var/run/udhcpc-usb0.pid -s /lib/netifd/dhcp.script -R -a -f -t 0 -i usb0 -C -O 33 -O 121
+26252 root         0 SW   [kworker/u2:1]
+28556 root      1184 S    sh -c logread
+28557 root      1324 S    logread
+28559 root      1688 S    /sbin/logd -S 530
+32107 root      1128 S    /usr/sbin/dropbear -F -P /var/run/dropbear.1.pid -p 22 -K 300 -T 3
+32336 root      1188 S    -ash
+\n[top snapshot]
+Mem: 63364K used, 59356K free, 732K shrd, 4904K buff, 11568K cached
+CPU:   0% usr   0% sys   0% nic 100% idle   0% io   0% irq   0% sirq
+Load average: 0.23 0.32 0.34 1/69 6590
+  PID  PPID USER     STAT   VSZ %VSZ %CPU COMMAND
+ 6590  6562 root     R     1192   1%   0% top -bn1
+ 6889     1 root     S     4144   3%   0% /usr/sbin/cmagent -m router -b 127.0.0.1 -p 8883 -a -t 30
+ 2617     1 root     S     3820   3%   0% /usr/bin/gcom
+ 2262     1 root     S     3676   3%   0% /usr/sbin/softapd
+10711     1 root     S     3512   3%   0% /usr/sbin/uhttpd -f -h /www -r LT500D -x /cgi-bin -u /ubus -t 60 -T 30 -k 20 -A 1 -n 3 -N 100 -p 0.0.0.0:80 -p [::]:80 -C /etc/uhttpd.crt -K /etc/uhttpd.key -s 0.0.0.0:443 -s [::]:443
+ 3911     1 mosquitt S     3316   3%   0% mosquitto -c /etc/mosquitto/mosquitto.conf
+ 3928     1 root     S     3068   2%   0% /usr/sbin/umdns
+28559     1 root     S     1688   1%   0% /sbin/logd -S 530
+ 2468     1 root     S     1684   1%   0% /sbin/netifd
+ 3429     1 dnsmasq  S     1628   1%   0% /usr/sbin/dnsmasq -C /var/etc/dnsmasq.conf.cfg02411c -k -x /var/run/dnsmasq/dnsmasq.cfg02411c.pid
+    1     0 root     S     1544   1%   0% /sbin/procd
+ 2247     1 root     S     1440   1%   0% /sbin/rpcd
+ 9264  2617 root     S     1424   1%   0% /bin/sh /usr/lib/4g/4gup.sh 4g
+ 4426     1 root     S     1424   1%   0% /usr/sbin/odhcpd
+ 4448     1 root     S     1324   1%   0% /usr/sbin/pingcheck
+28557 28556 root     S     1324   1%   0% logread
+ 2297     1 root     S     1300   1%   0% /usr/sbin/hyfibrd
+ 6562 32336 root     S     1192   1%   0% sh RE-PERFORMANCE-PROBE-01.sh
+  418     1 root     S     1188   1%   0% /sbin/ubusd
+32336 32107 root     S     1188   1%   0% -ash
+ 3455     1 root     S     1188   1%   0% /usr/sbin/crond -f -c /etc/crontabs -l 5
+ 7175     1 root     S <   1184   1%   0% /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug -p time.windows.com -p time.nist.gov -p time-nw.nist.gov -p time-a.nist.gov -p time-b.nist.gov -p time-ios.apple.com -p time.apple.com -p time.asia.apple.com -p pool.ntp.org -p time.android.com
+ 7176     1 root     S <   1184   1%   0% /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug -p 0.openwrt.pool.ntp.org -p 1.openwrt.pool.ntp.org -p 2.openwrt.pool.ntp.org -p 3.openwrt.pool.ntp.org
+ 6561  9264 root     S     1184   1%   0% sleep 5
+28556     1 root     S     1184   1%   0% sh -c logread
+22391  2468 root     S     1184   1%   0% udhcpc -p /var/run/udhcpc-usb0.pid -s /lib/netifd/dhcp.script -R -a -f -t 0 -i usb0 -C -O 33 -O 121
+20418 20417 root     S     1184   1%   0% ash -c /usr/libexec/sftp-server
+20417  3812 root     S     1128   1%   0% /usr/sbin/dropbear -F -P /var/run/dropbear.1.pid -p 22 -K 300 -T 3
+32107  3812 root     S     1128   1%   0% /usr/sbin/dropbear -F -P /var/run/dropbear.1.pid -p 22 -K 300 -T 3
+ 3812     1 root     S     1060   1%   0% /usr/sbin/dropbear -F -P /var/run/dropbear.1.pid -p 22 -K 300 -T 3
+20419 20418 root     S     1020   1%   0% /usr/libexec/sftp-server
+  424     1 root     S      892   1%   0% /sbin/askfirst /usr/libexec/login.sh
+    3     2 root     SW       0   0%   0% [ksoftirqd/0]
+    4     2 root     SW       0   0%   0% [kworker/0:0]
+  970     2 root     SW       0   0%   0% [RtmpCmdQTask]
+  972     2 root     SW       0   0%   0% [RtmpMlmeTask]
+  198     2 root     SW       0   0%   0% [spi32766]
+ 1047     2 root     SW       0   0%   0% [HwCtrlTask]
+ 4285     2 root     SWN      0   0%   0% [jffs2_gcd_mtd9]
+  107     2 root     SW       0   0%   0% [kworker/0:1]
+  115     2 root     SW       0   0%   0% [kswapd0]
+ 1049     2 root     SW       0   0%   0% [RtmpMlmeTask]
+26252     2 root     SW       0   0%   0% [kworker/u2:1]
+ 9991     2 root     SW       0   0%   0% [kworker/u2:0]
+  282     2 root     SW<      0   0%   0% [kworker/0:1H]
+ 1048     2 root     SW       0   0%   0% [ser_task]
+  971     2 root     SW       0   0%   0% [RtmpWscTask]
+ 1019     2 root     SW       0   0%   0% [RtmpCmdQTask]
+  566     2 root     SW<      0   0%   0% [bioset]
+ 1046     2 root     SW       0   0%   0% [RtmpWscTask]
+  242     2 root     SW<      0   0%   0% [bioset]
+  237     2 root     SW<      0   0%   0% [bioset]
+  247     2 root     SW<      0   0%   0% [bioset]
+  227     2 root     SW<      0   0%   0% [bioset]
+  217     2 root     SW<      0   0%   0% [bioset]
+  212     2 root     SW<      0   0%   0% [bioset]
+  222     2 root     SW<      0   0%   0% [bioset]
+  232     2 root     SW<      0   0%   0% [bioset]
+  273     2 root     SW<      0   0%   0% [ipv6_addrconf]
+  168     2 root     SW       0   0%   0% [fsnotify_mark]
+  202     2 root     SW<      0   0%   0% [bioset]
+   74     2 root     SW<      0   0%   0% [crypto]
+    7     2 root     SW<      0   0%   0% [writeback]
+   75     2 root     SW<      0   0%   0% [bioset]
+    2     0 root     SW       0   0%   0% [kthreadd]
+    5     2 root     SW<      0   0%   0% [kworker/0:0H]
+   77     2 root     SW<      0   0%   0% [kblockd]
+  207     2 root     SW<      0   0%   0% [bioset]
+  279     2 root     SW<      0   0%   0% [deferwq]
+
+\n================================================================
+SERVICE STATE / PID / RSS
+================================================================
+uhttpd pid=6593 rss_kb=NA ticks=NA
+rpcd pid=2247 rss_kb=692 ticks=189
+dnsmasq pid=3429 rss_kb=1072 ticks=19
+dropbear pid=3812 rss_kb=668 ticks=14
+gcom pid=2617 rss_kb=1408 ticks=165058
+pingcheck pid=4448 rss_kb=508 ticks=1303
+cmagent pid=6639 rss_kb=NA ticks=NA
+cmsd pid=6645 rss_kb=NA ticks=NA
+mosquitto pid=3911 rss_kb=2180 ticks=13501
+umdns pid=3928 rss_kb=1736 ticks=4606
+hcshd pid=6667 rss_kb=NA ticks=NA
+hyfibr pid=2297 rss_kb=424 ticks=1232
+softapd pid=2262 rss_kb=1800 ticks=79297
+netifd pid=2468 rss_kb=484 ticks=2877
+odhcpd pid=4426 rss_kb=592 ticks=2816
+cron pid=3455 rss_kb=808 ticks=0
+\n================================================================
+INIT ENABLEMENT
+================================================================
+lrwxrwxrwx    1 root     root            20 Aug  4  2025 /etc/rc.d/S00sysfixtime -> ../init.d/sysfixtime
+lrwxrwxrwx    1 root     root            14 Aug  4  2025 /etc/rc.d/S10boot -> ../init.d/boot
+lrwxrwxrwx    1 root     root            16 Aug  4  2025 /etc/rc.d/S10system -> ../init.d/system
+lrwxrwxrwx    1 root     root            16 Aug  4  2025 /etc/rc.d/S11sysctl -> ../init.d/sysctl
+lrwxrwxrwx    1 root     root            13 Aug  4  2025 /etc/rc.d/S12log -> ../init.d/log
+lrwxrwxrwx    1 root     root            14 Aug  4  2025 /etc/rc.d/S12rpcd -> ../init.d/rpcd
+lrwxrwxrwx    1 root     root            17 Aug  4  2025 /etc/rc.d/S12softapd -> ../init.d/softapd
+lrwxrwxrwx    1 root     root            14 Aug  4  2025 /etc/rc.d/S15zram -> ../init.d/zram
+lrwxrwxrwx    1 root     root            17 Aug  4  2025 /etc/rc.d/S18hyfibrd -> ../init.d/hyfibrd
+lrwxrwxrwx    1 root     root            17 Aug  4  2025 /etc/rc.d/S19dnsmasq -> ../init.d/dnsmasq
+lrwxrwxrwx    1 root     root            18 Aug  4  2025 /etc/rc.d/S19firewall -> ../init.d/firewall
+lrwxrwxrwx    1 root     root            17 Aug  4  2025 /etc/rc.d/S20network -> ../init.d/network
+lrwxrwxrwx    1 root     root            17 Aug  4  2025 /etc/rc.d/S20usbmode -> ../init.d/usbmode
+lrwxrwxrwx    1 root     root            16 Aug  4  2025 /etc/rc.d/S30stubby -> ../init.d/stubby
+lrwxrwxrwx    1 root     root            16 Aug  4  2025 /etc/rc.d/S35odhcpd -> ../init.d/odhcpd
+lrwxrwxrwx    1 root     root            14 Aug  4  2025 /etc/rc.d/S38gcom -> ../init.d/gcom
+lrwxrwxrwx    1 root     root            15 Aug  4  2025 /etc/rc.d/S40fstab -> ../init.d/fstab
+lrwxrwxrwx    1 root     root            14 Aug  4  2025 /etc/rc.d/S50cron -> ../init.d/cron
+lrwxrwxrwx    1 root     root            18 Aug  4  2025 /etc/rc.d/S50dropbear -> ../init.d/dropbear
+lrwxrwxrwx    1 root     root            16 Aug  4  2025 /etc/rc.d/S50telnet -> ../init.d/telnet
+lrwxrwxrwx    1 root     root            16 Aug  4  2025 /etc/rc.d/S50uhttpd -> ../init.d/uhttpd
+lrwxrwxrwx    1 root     root            15 Aug  4  2025 /etc/rc.d/S60l2tpd -> ../init.d/l2tpd
+lrwxrwxrwx    1 root     root            15 Aug  4  2025 /etc/rc.d/S60pptpd -> ../init.d/pptpd
+lrwxrwxrwx    1 root     root            16 Aug  4  2025 /etc/rc.d/S60xl2tpd -> ../init.d/xl2tpd
+lrwxrwxrwx    1 root     root            19 Aug  4  2025 /etc/rc.d/S80mosquitto -> ../init.d/mosquitto
+lrwxrwxrwx    1 root     root            15 Aug  4  2025 /etc/rc.d/S80umdns -> ../init.d/umdns
+lrwxrwxrwx    1 root     root            17 Aug  4  2025 /etc/rc.d/S82cmagent -> ../init.d/cmagent
+lrwxrwxrwx    1 root     root            14 Aug  4  2025 /etc/rc.d/S86cmsd -> ../init.d/cmsd
+lrwxrwxrwx    1 root     root            19 Aug  4  2025 /etc/rc.d/S88pingcheck -> ../init.d/pingcheck
+lrwxrwxrwx    1 root     root            15 Aug  4  2025 /etc/rc.d/S90ipsec -> ../init.d/ipsec
+lrwxrwxrwx    1 root     root            17 Aug  4  2025 /etc/rc.d/S90openvpn -> ../init.d/openvpn
+lrwxrwxrwx    1 root     root            18 Aug  4  2025 /etc/rc.d/S90zerotier -> ../init.d/zerotier
+lrwxrwxrwx    1 root     root            19 Aug  4  2025 /etc/rc.d/S94miniupnpd -> ../init.d/miniupnpd
+lrwxrwxrwx    1 root     root            14 Aug  4  2025 /etc/rc.d/S95ddns -> ../init.d/ddns
+lrwxrwxrwx    1 root     root            14 Aug  4  2025 /etc/rc.d/S95done -> ../init.d/done
+lrwxrwxrwx    1 root     root            13 Aug  4  2025 /etc/rc.d/S96led -> ../init.d/led
+lrwxrwxrwx    1 root     root            14 Aug  4  2025 /etc/rc.d/S98hcsh -> ../init.d/hcsh
+lrwxrwxrwx    1 root     root            17 Aug  4  2025 /etc/rc.d/S98sysntpd -> ../init.d/sysntpd
+lrwxrwxrwx    1 root     root            17 Aug  4  2025 /etc/rc.d/S99arpbind -> ../init.d/arpbind
+lrwxrwxrwx    1 root     root            20 Aug  4  2025 /etc/rc.d/S99autoreboot -> ../init.d/autoreboot
+lrwxrwxrwx    1 root     root            14 Aug  4  2025 /etc/rc.d/S99cwmp -> ../init.d/cwmp
+lrwxrwxrwx    1 root     root            17 Aug  4  2025 /etc/rc.d/S99doneled -> ../init.d/doneled
+lrwxrwxrwx    1 root     root            14 Aug  4  2025 /etc/rc.d/S99eqos -> ../init.d/eqos
+lrwxrwxrwx    1 root     root            19 Aug  4  2025 /etc/rc.d/S99igmpproxy -> ../init.d/igmpproxy
+lrwxrwxrwx    1 root     root            13 Aug  4  2025 /etc/rc.d/S99smp -> ../init.d/smp
+lrwxrwxrwx    1 root     root            17 Aug  4  2025 /etc/rc.d/S99timewol -> ../init.d/timewol
+lrwxrwxrwx    1 root     root            23 Aug  4  2025 /etc/rc.d/S99udpechoserver -> ../init.d/udpechoserver
+lrwxrwxrwx    1 root     root            22 Aug  4  2025 /etc/rc.d/S99urandom_seed -> ../init.d/urandom_seed
+lrwxrwxrwx    1 root     root            14 Aug  4  2025 /etc/rc.d/S99vlan -> ../init.d/vlan
+\n================================================================
+CRON
+================================================================
+0 0 * * * /etc/init.d/firewall reload
+\n================================================================
+NETWORK SUMMARY
+================================================================
+\n### ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UNKNOWN group default qlen 1000
+    link/ether 80:af:ca:da:26:08 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::82af:caff:feda:2608/64 scope link 
+       valid_lft forever preferred_lft forever
+3: rai0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel master br-lan state UP group default qlen 1000
+    link/ether 80:af:ca:da:26:0a brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::82af:caff:feda:260a/64 scope link 
+       valid_lft forever preferred_lft forever
+4: ip6tnl0@NONE: <NOARP> mtu 1452 qdisc noop state DOWN group default qlen 1
+    link/tunnel6 :: brd ::
+5: ifb0: <BROADCAST,NOARP> mtu 1500 qdisc noop state DOWN group default qlen 32
+    link/ether a6:59:1f:7e:b1:3b brd ff:ff:ff:ff:ff:ff
+6: ifb1: <BROADCAST,NOARP> mtu 1500 qdisc noop state DOWN group default qlen 32
+    link/ether fe:76:77:54:54:6f brd ff:ff:ff:ff:ff:ff
+7: gre0@NONE: <NOARP> mtu 1476 qdisc noop state DOWN group default qlen 1
+    link/gre 0.0.0.0 brd 0.0.0.0
+8: gretap0@NONE: <BROADCAST,MULTICAST> mtu 1462 qdisc noop state DOWN group default qlen 1000
+    link/ether 00:00:00:00:00:00 brd ff:ff:ff:ff:ff:ff
+13: usb0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether 02:0c:29:a3:9b:6d brd ff:ff:ff:ff:ff:ff
+    inet 10.194.42.81/24 brd 10.194.42.255 scope global usb0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::c:29ff:fea3:9b6d/64 scope link 
+       valid_lft forever preferred_lft forever
+14: ra0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel master br-lan state UP group default qlen 1000
+    link/ether 80:af:ca:da:26:08 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::82af:caff:feda:2608/64 scope link 
+       valid_lft forever preferred_lft forever
+15: ra1: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 82:af:ca:da:26:08 brd ff:ff:ff:ff:ff:ff
+16: ra2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel master br-lan state UNKNOWN group default qlen 1000
+    link/ether 82:af:ca:ea:26:08 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::80af:caff:feea:2608/64 scope link 
+       valid_lft forever preferred_lft forever
+17: apcli0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 86:af:ca:0a:26:08 brd ff:ff:ff:ff:ff:ff
+18: rai1: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 00:00:00:00:00:00 brd ff:ff:ff:ff:ff:ff
+19: rai2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel master br-lan state UNKNOWN group default qlen 1000
+    link/ether 82:af:ca:ea:26:0a brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::80af:caff:feea:260a/64 scope link 
+       valid_lft forever preferred_lft forever
+20: apclii0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 86:af:ca:da:26:0a brd ff:ff:ff:ff:ff:ff
+21: br-lan: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    link/ether 80:af:ca:da:26:08 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.10.1/24 brd 192.168.10.255 scope global br-lan
+       valid_lft forever preferred_lft forever
+22: eth0.1@eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master br-lan state UP group default qlen 1000
+    link/ether 80:af:ca:da:26:08 brd ff:ff:ff:ff:ff:ff
+\n### ip route
+default via 10.194.42.1 dev usb0  proto static  src 10.194.42.81  metric 40 
+10.194.42.0/24 dev usb0  proto static  scope link  metric 40 
+10.194.42.1 dev usb0  proto static  scope link  src 10.194.42.81  metric 40 
+192.168.10.0/24 dev br-lan  proto kernel  scope link  src 192.168.10.1 
+\n### brctl show
+bridge name	bridge id		STP enabled	interfaces
+br-lan		7fff.80afcada2608	no		eth0.1
+							ra0
+							ra2
+							rai0
+							rai2
+\n### netstat -lnp
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      10711/uhttpd
+tcp        0      0 0.0.0.0:8883            0.0.0.0:*               LISTEN      3911/mosquitto
+tcp        0      0 0.0.0.0:53              0.0.0.0:*               LISTEN      3429/dnsmasq
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      3812/dropbear
+tcp        0      0 0.0.0.0:443             0.0.0.0:*               LISTEN      10711/uhttpd
+tcp        0      0 0.0.0.0:1883            0.0.0.0:*               LISTEN      3911/mosquitto
+tcp        0      0 :::80                   :::*                    LISTEN      10711/uhttpd
+tcp        0      0 :::53                   :::*                    LISTEN      3429/dnsmasq
+tcp        0      0 :::22                   :::*                    LISTEN      3812/dropbear
+tcp        0      0 :::443                  :::*                    LISTEN      10711/uhttpd
+udp        0      0 0.0.0.0:47383           0.0.0.0:*                           3928/umdns
+udp        0      0 0.0.0.0:53              0.0.0.0:*                           3429/dnsmasq
+udp        0      0 0.0.0.0:67              0.0.0.0:*                           3429/dnsmasq
+udp        0      0 0.0.0.0:5353            0.0.0.0:*                           3928/umdns
+udp        0      0 :::547                  :::*                                4426/odhcpd
+udp        0      0 :::53                   :::*                                3429/dnsmasq
+raw        0      0 0.0.0.0:1               0.0.0.0:*               1           4448/pingcheck
+raw        0      0 ::%1:58                 ::%4445916:*            58          4426/odhcpd
+Active UNIX domain sockets (only servers)
+Proto RefCnt Flags       Type       State         I-Node PID/Program name    Path
+unix  2      [ ACC ]     STREAM     LISTENING        296 418/ubusd           /var/run/ubus.sock
+\n[/proc/net/dev]
+Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+  ifb0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+   ra2:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  gre0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+eth0.1: 2508056900 5374404    0  160    0     0          0    249403 9838924689 15900959    0    0    0     0       0          0
+    lo:  849307   10877    0    0    0     0          0         0   849307   10877    0    0    0     0       0          0
+  usb0: 10027923778 9029274    0  965    0     0          0         0 1833151567 4352793    0    0    0     0       0          0
+   ra1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+gretap0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  rai2:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+   ra0: 1730720438 66711731 1464   57    0     0          0    287863 151986093 34524482    0    0    0     0       0          0
+  rai1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  eth0: 2620879434 5651686    0    2    0     0          0         0 1312488973 15900845    0    0    0     0       0          0
+  ifb1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  rai0: 1757920407 22606317 46270  140    0     0          0         0 779252539 45650487    0    0    0     0       0          0
+apcli0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+ip6tnl0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+br-lan: 2282262759 5086974    0  145    0     0          0         0 10402642407 9339418    0    0    0     0       0          0
+apclii0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+\n================================================================
+CONNTRACK
+================================================================
+count=85
+max=16384
+table_lines=85
+\n================================================================
+LOG ERROR COUNTS
+================================================================
+Command failed: Not found=0
+Interface .* not found or error=0
+socket buffer is full=0
+failed to sync jffs2 overlay=0
+no jffs2 marker found=0
+drop_caches=0
+linkdown=0
+linkup=0
+DE-AUTH=0
+DIS-ASSOC=0
+MIC Different=0
+bdinfo.*failed=0
+module is already loaded=6
+\n[recent log tail]
+Fri Sep 25 01:02:00 2026 daemon.info dnsmasq-dhcp[26230]: DHCPREQUEST(br-lan) 192.168.10.132 fc:34:97:e1:11:30 
+Fri Sep 25 01:02:00 2026 daemon.info dnsmasq-dhcp[26230]: DHCPACK(br-lan) 192.168.10.132 fc:34:97:e1:11:30 TUFi9
+Fri Sep 25 01:03:03 2026 daemon.info dnsmasq-dhcp[26230]: DHCPREQUEST(br-lan) 192.168.10.156 4c:eb:42:0e:98:c7 
+Fri Sep 25 01:03:03 2026 daemon.info dnsmasq-dhcp[26230]: DHCPACK(br-lan) 192.168.10.156 4c:eb:42:0e:98:c7 Dell-Vostro-3750
+Fri Sep 25 01:05:15 2026 user.notice luci: firewall qos miniupnpd
+Fri Sep 25 01:05:17 2026 daemon.err insmod: module is already loaded - nf_nat_pptp
+Fri Sep 25 01:05:17 2026 daemon.err insmod: module is already loaded - nf_nat_ftp
+Fri Sep 25 01:05:17 2026 daemon.err insmod: module is already loaded - nf_nat_tftp
+Fri Sep 25 01:05:17 2026 daemon.err insmod: module is already loaded - nf_nat_h323
+Fri Sep 25 01:05:17 2026 daemon.err insmod: module is already loaded - nf_nat_sip
+Fri Sep 25 01:05:17 2026 daemon.err insmod: module is already loaded - nf_nat_rtsp
+Fri Sep 25 01:05:17 2026 user.notice vpn: firewall delete vpn policy
+Fri Sep 25 01:05:18 2026 daemon.info dnsmasq[26230]: exiting on receipt of SIGTERM
+Fri Sep 25 01:05:18 2026 daemon.info dnsmasq[3429]: started, version 2.78 cachesize 150
+Fri Sep 25 01:05:18 2026 daemon.info dnsmasq[3429]: DNS service limited to local subnets
+Fri Sep 25 01:05:18 2026 daemon.info dnsmasq[3429]: compile time options: IPv6 GNU-getopt no-DBus no-i18n regex(+ipset) no-IDN DHCP no-DHCPv6 no-Lua TFTP conntrack ipset no-auth no-DNSSEC no-ID loop-detect inotify
+Fri Sep 25 01:05:18 2026 daemon.info dnsmasq-dhcp[3429]: DHCP, IP range 192.168.10.10 -- 192.168.10.250, lease time 2h
+Fri Sep 25 01:05:18 2026 daemon.info dnsmasq[3429]: using local addresses only for domain lan
+Fri Sep 25 01:05:18 2026 daemon.info dnsmasq[3429]: reading /tmp/resolv.conf.auto
+Fri Sep 25 01:05:18 2026 daemon.info dnsmasq[3429]: using local addresses only for domain lan
+Fri Sep 25 01:05:18 2026 daemon.info dnsmasq[3429]: using nameserver 84.2.46.1#53
+Fri Sep 25 01:05:18 2026 daemon.info dnsmasq[3429]: using nameserver 84.2.44.1#53
+Fri Sep 25 01:05:18 2026 daemon.info dnsmasq[3429]: read /etc/hosts - 4 addresses
+Fri Sep 25 01:05:18 2026 daemon.info dnsmasq[3429]: read /tmp/hosts/dhcp.cfg02411c - 0 addresses
+Fri Sep 25 01:05:18 2026 daemon.info dnsmasq-dhcp[3429]: read /etc/ethers - 0 addresses
+Fri Sep 25 01:05:19 2026 cron.info crond[3455]: crond (busybox 1.25.1) started, log level 5
+Fri Sep 25 01:07:58 2026 kern.warn kernel: [161275.496154] zram: 6578 (cat) Attribute compr_data_size (and others) will be removed. See zram documentation.
+\n================================================================
+30-SECOND RUNTIME SAMPLING
+================================================================
+samples=6 interval_seconds=5
+\n--- sample 1/6 Fri Sep 25 01:08:01 CEST 2026 ---
+load=0.29 0.33 0.35 1/69 6918
+MemFree:59012kB MemAvailable:64804kB Cached:11592kB SwapCached:600kB SwapFree:58528kB Dirty:0kB Writeback:0kB Slab:12284kB SReclaimable:2624kB SUnreclaim:9660kB 
+cpu cpu  1207893 0 1156996 12210606 0 0 1552433 0 0 0
+intr_total=254442369
+ctxt 67922877
+processes 3023043
+uhttpd pid=6923 rss_kb=NA ticks=NA
+rpcd pid=2247 rss_kb=692 ticks=189
+dnsmasq pid=3429 rss_kb=1072 ticks=20
+dropbear pid=3812 rss_kb=668 ticks=14
+gcom pid=2617 rss_kb=1408 ticks=165058
+pingcheck pid=4448 rss_kb=508 ticks=1303
+cmagent pid=6889 rss_kb=3208 ticks=189
+cmsd pid=6980 rss_kb=NA ticks=NA
+mosquitto pid=3911 rss_kb=2180 ticks=13501
+umdns pid=3928 rss_kb=1736 ticks=4607
+hcshd pid=7032 rss_kb=NA ticks=NA
+hyfibr pid=2297 rss_kb=424 ticks=1232
+softapd pid=2262 rss_kb=1800 ticks=79299
+netifd pid=2468 rss_kb=484 ticks=2877
+odhcpd pid=4426 rss_kb=592 ticks=2816
+cron pid=3455 rss_kb=808 ticks=0
+Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+  ifb0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+   ra2:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  gre0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+eth0.1: 2508061159 5374425    0  160    0     0          0    249407 9838982833 15901086    0    0    0     0       0          0
+    lo:  849307   10877    0    0    0     0          0         0   849307   10877    0    0    0     0       0          0
+  usb0: 10027923973 9029277    0  965    0     0          0         0 1833151754 4352796    0    0    0     0       0          0
+   ra1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+gretap0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  rai2:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+   ra0: 1730922520 66712090 1464   57    0     0          0    287867 151986197 34524484    0    0    0     0       0          0
+  rai1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  eth0: 2620884071 5651707    0    2    0     0          0         0 1312547625 15900972    0    0    0     0       0          0
+  ifb1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  rai0: 1757922205 22606335 46275  140    0     0          0         0 779390413 45650736    0    0    0     0       0          0
+apcli0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+ip6tnl0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+br-lan: 2282271507 5086995    0  145    0     0          0         0 10402642752 9339423    0    0    0     0       0          0
+apclii0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+[top]
+Mem: 64316K used, 58404K free, 756K shrd, 4904K buff, 11596K cached
+CPU:  50% usr  40% sys   0% nic   0% idle   0% io   0% irq  10% sirq
+Load average: 0.29 0.33 0.35 2/70 7174
+  PID  PPID USER     STAT   VSZ %VSZ %CPU COMMAND
+ 2617     1 root     S     3820   3%  10% /usr/bin/gcom
+ 9264  2617 root     S     1424   1%  10% /bin/sh /usr/lib/4g/4gup.sh 4g
+ 7153  6562 root     R     1192   1%  10% top -bn1
+ 6889     1 root     S     4144   3%   0% /usr/sbin/cmagent -m router -b 127.0.0.1 -p 8883 -a -t 30
+ 2262     1 root     S     3676   3%   0% /usr/sbin/softapd
+10711     1 root     S     3512   3%   0% /usr/sbin/uhttpd -f -h /www -r LT500D -x /cgi-bin -u /ubus -t 60 -T 30 -k 20 -A 1 -n 3 -N 100 -p 0.0.0.0:80 -p [::]:80 -C /etc/uhttpd.crt -K /etc/uhttpd.key -s 0.0.0.0:443 -s [::]:443
+ 3911     1 mosquitt S     3316   3%   0% mosquitto -c /etc/mosquitto/mosquitto.conf
+ 3928     1 root     S     3068   2%   0% /usr/sbin/umdns
+28559     1 root     S     1688   1%   0% /sbin/logd -S 530
+ 2468     1 root     S     1684   1%   0% /sbin/netifd
+ 3429     1 dnsmasq  S     1628   1%   0% /usr/sbin/dnsmasq -C /var/etc/dnsmasq.conf.cfg02411c -k -x /var/run/dnsmasq/dnsmasq.cfg02411c.pid
+    1     0 root     S     1544   1%   0% /sbin/procd
+ 2247     1 root     S     1440   1%   0% /sbin/rpcd
+ 4426     1 root     S     1424   1%   0% /usr/sbin/odhcpd
+ 4448     1 root     S     1324   1%   0% /usr/sbin/pingcheck
+28557 28556 root     S     1324   1%   0% logread
+ 2297     1 root     S     1300   1%   0% /usr/sbin/hyfibrd
+ 6562 32336 root     S     1196   1%   0% sh RE-PERFORMANCE-PROBE-01.sh
+  418     1 root     S     1188   1%   0% /sbin/ubusd
+32336 32107 root     S     1188   1%   0% -ash
+ 3455     1 root     S     1188   1%   0% /usr/sbin/crond -f -c /etc/crontabs -l 5
+\n--- sample 2/6 Fri Sep 25 01:08:08 CEST 2026 ---
+load=0.27 0.33 0.35 1/69 7185
+MemFree:59336kB MemAvailable:65132kB Cached:11600kB SwapCached:600kB SwapFree:58528kB Dirty:0kB Writeback:0kB Slab:12292kB SReclaimable:2632kB SUnreclaim:9660kB 
+cpu cpu  1207976 0 1157103 12211087 0 0 1552455 0 0 0
+intr_total=254446459
+ctxt 67926306
+processes 3023309
+uhttpd pid=7192 rss_kb=NA ticks=NA
+rpcd pid=2247 rss_kb=692 ticks=189
+dnsmasq pid=3429 rss_kb=1072 ticks=20
+dropbear pid=3812 rss_kb=668 ticks=14
+gcom pid=2617 rss_kb=1408 ticks=165066
+pingcheck pid=4448 rss_kb=508 ticks=1303
+cmagent pid=6889 rss_kb=3208 ticks=190
+cmsd pid=7308 rss_kb=NA ticks=NA
+mosquitto pid=3911 rss_kb=2180 ticks=13502
+umdns pid=3928 rss_kb=1736 ticks=4608
+hcshd pid=7355 rss_kb=NA ticks=NA
+hyfibr pid=2297 rss_kb=424 ticks=1232
+softapd pid=2262 rss_kb=1800 ticks=79303
+netifd pid=2468 rss_kb=484 ticks=2877
+odhcpd pid=4426 rss_kb=592 ticks=2816
+cron pid=3455 rss_kb=808 ticks=0
+Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+  ifb0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+   ra2:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  gre0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+eth0.1: 2508121519 5374654    0  160    0     0          0    249431 9839151270 15901657    0    0    0     0       0          0
+    lo:  849307   10877    0    0    0     0          0         0   849307   10877    0    0    0     0       0          0
+  usb0: 10027926442 9029301    0  965    0     0          0         0 1833153471 4352817    0    0    0     0       0          0
+   ra1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+gretap0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  rai2:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+   ra0: 1731418460 66712896 1464   57    0     0          0    287879 151986620 34524489    0    0    0     0       0          0
+  rai1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  eth0: 2620948553 5651936    0    2    0     0          0         0 1312718346 15901543    0    0    0     0       0          0
+  ifb1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  rai0: 1757957896 22606674 46291  140    0     0          0         0 779792015 45651491    0    0    0     0       0          0
+apcli0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+ip6tnl0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+br-lan: 2282299400 5087069    0  145    0     0          0         0 10402647181 9339458    0    0    0     0       0          0
+apclii0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+[top]
+Mem: 63428K used, 59292K free, 760K shrd, 4904K buff, 11600K cached
+CPU:   0% usr   9% sys   0% nic  81% idle   0% io   0% irq   9% sirq
+Load average: 0.48 0.37 0.36 1/70 7407
+  PID  PPID USER     STAT   VSZ %VSZ %CPU COMMAND
+ 7406  6562 root     R     1192   1%   9% top -bn1
+ 6889     1 root     S     4144   3%   0% /usr/sbin/cmagent -m router -b 127.0.0.1 -p 8883 -a -t 30
+ 2617     1 root     S     3820   3%   0% /usr/bin/gcom
+ 2262     1 root     S     3676   3%   0% /usr/sbin/softapd
+10711     1 root     S     3512   3%   0% /usr/sbin/uhttpd -f -h /www -r LT500D -x /cgi-bin -u /ubus -t 60 -T 30 -k 20 -A 1 -n 3 -N 100 -p 0.0.0.0:80 -p [::]:80 -C /etc/uhttpd.crt -K /etc/uhttpd.key -s 0.0.0.0:443 -s [::]:443
+ 3911     1 mosquitt S     3316   3%   0% mosquitto -c /etc/mosquitto/mosquitto.conf
+ 3928     1 root     S     3068   2%   0% /usr/sbin/umdns
+28559     1 root     S     1688   1%   0% /sbin/logd -S 530
+ 2468     1 root     S     1684   1%   0% /sbin/netifd
+ 3429     1 dnsmasq  S     1628   1%   0% /usr/sbin/dnsmasq -C /var/etc/dnsmasq.conf.cfg02411c -k -x /var/run/dnsmasq/dnsmasq.cfg02411c.pid
+    1     0 root     S     1544   1%   0% /sbin/procd
+ 2247     1 root     S     1440   1%   0% /sbin/rpcd
+ 9264  2617 root     S     1424   1%   0% /bin/sh /usr/lib/4g/4gup.sh 4g
+ 4426     1 root     S     1424   1%   0% /usr/sbin/odhcpd
+ 4448     1 root     S     1324   1%   0% /usr/sbin/pingcheck
+28557 28556 root     S     1324   1%   0% logread
+ 2297     1 root     S     1300   1%   0% /usr/sbin/hyfibrd
+ 6562 32336 root     S     1196   1%   0% sh RE-PERFORMANCE-PROBE-01.sh
+  418     1 root     S     1188   1%   0% /sbin/ubusd
+32336 32107 root     S     1188   1%   0% -ash
+ 3455     1 root     S     1188   1%   0% /usr/sbin/crond -f -c /etc/crontabs -l 5
+\n--- sample 3/6 Fri Sep 25 01:08:15 CEST 2026 ---
+load=0.45 0.37 0.36 2/75 7478
+MemFree:59532kB MemAvailable:65328kB Cached:11604kB SwapCached:600kB SwapFree:58528kB Dirty:0kB Writeback:0kB Slab:12292kB SReclaimable:2632kB SUnreclaim:9660kB 
+cpu cpu  1208051 0 1157218 12211545 0 0 1552475 0 0 0
+intr_total=254451242
+ctxt 67929871
+processes 3023604
+uhttpd pid=7486 rss_kb=NA ticks=NA
+rpcd pid=2247 rss_kb=692 ticks=189
+dnsmasq pid=3429 rss_kb=1072 ticks=20
+dropbear pid=3812 rss_kb=668 ticks=14
+gcom pid=2617 rss_kb=1408 ticks=165075
+pingcheck pid=4448 rss_kb=508 ticks=1303
+cmagent pid=6889 rss_kb=3208 ticks=190
+cmsd pid=7565 rss_kb=NA ticks=NA
+mosquitto pid=3911 rss_kb=2180 ticks=13502
+umdns pid=3928 rss_kb=1736 ticks=4608
+hcshd pid=7587 rss_kb=NA ticks=NA
+hyfibr pid=2297 rss_kb=424 ticks=1232
+softapd pid=2262 rss_kb=1800 ticks=79305
+netifd pid=2468 rss_kb=484 ticks=2877
+odhcpd pid=4426 rss_kb=592 ticks=2816
+cron pid=3455 rss_kb=808 ticks=0
+Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+  ifb0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+   ra2:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  gre0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+eth0.1: 2508170770 5374944    0  160    0     0          0    249449 9839319705 15902359    0    0    0     0       0          0
+    lo:  849307   10877    0    0    0     0          0         0   849307   10877    0    0    0     0       0          0
+  usb0: 10027926622 9029305    0  965    0     0          0         0 1833153696 4352821    0    0    0     0       0          0
+   ra1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+gretap0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  rai2:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+   ra0: 1731749060 66713589 1464   57    0     0          0    287895 151987134 34524496    0    0    0     0       0          0
+  rai1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  eth0: 2621003024 5652226    0    2    0     0          0         0 1312889589 15902245    0    0    0     0       0          0
+  ifb1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  rai0: 1758004160 22607113 46291  140    0     0          0         0 780036909 45652182    0    0    0     0       0          0
+apcli0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+ip6tnl0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+br-lan: 2282329059 5087131    0  145    0     0          0         0 10402655134 9339480    0    0    0     0       0          0
+apclii0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+[top]
+Mem: 63140K used, 59580K free, 768K shrd, 4904K buff, 11608K cached
+CPU:   0% usr   9% sys   0% nic  90% idle   0% io   0% irq   0% sirq
+Load average: 0.45 0.37 0.36 1/70 7633
+  PID  PPID USER     STAT   VSZ %VSZ %CPU COMMAND
+ 6889     1 root     S     4144   3%   0% /usr/sbin/cmagent -m router -b 127.0.0.1 -p 8883 -a -t 30
+ 2617     1 root     S     3820   3%   0% /usr/bin/gcom
+ 2262     1 root     S     3676   3%   0% /usr/sbin/softapd
+10711     1 root     S     3512   3%   0% /usr/sbin/uhttpd -f -h /www -r LT500D -x /cgi-bin -u /ubus -t 60 -T 30 -k 20 -A 1 -n 3 -N 100 -p 0.0.0.0:80 -p [::]:80 -C /etc/uhttpd.crt -K /etc/uhttpd.key -s 0.0.0.0:443 -s [::]:443
+ 3911     1 mosquitt S     3316   3%   0% mosquitto -c /etc/mosquitto/mosquitto.conf
+ 3928     1 root     S     3068   2%   0% /usr/sbin/umdns
+28559     1 root     S     1688   1%   0% /sbin/logd -S 530
+ 2468     1 root     S     1684   1%   0% /sbin/netifd
+ 3429     1 dnsmasq  S     1628   1%   0% /usr/sbin/dnsmasq -C /var/etc/dnsmasq.conf.cfg02411c -k -x /var/run/dnsmasq/dnsmasq.cfg02411c.pid
+    1     0 root     S     1544   1%   0% /sbin/procd
+ 2247     1 root     S     1440   1%   0% /sbin/rpcd
+ 9264  2617 root     S     1424   1%   0% /bin/sh /usr/lib/4g/4gup.sh 4g
+ 4426     1 root     S     1424   1%   0% /usr/sbin/odhcpd
+ 4448     1 root     S     1324   1%   0% /usr/sbin/pingcheck
+28557 28556 root     S     1324   1%   0% logread
+ 2297     1 root     S     1300   1%   0% /usr/sbin/hyfibrd
+ 6562 32336 root     S     1196   1%   0% sh RE-PERFORMANCE-PROBE-01.sh
+ 7632  6562 root     R     1192   1%   0% top -bn1
+  418     1 root     S     1188   1%   0% /sbin/ubusd
+32336 32107 root     S     1188   1%   0% -ash
+ 3455     1 root     S     1188   1%   0% /usr/sbin/crond -f -c /etc/crontabs -l 5
+\n--- sample 4/6 Fri Sep 25 01:08:21 CEST 2026 ---
+load=0.41 0.36 0.36 1/69 7732
+MemFree:59048kB MemAvailable:64844kB Cached:11608kB SwapCached:600kB SwapFree:58528kB Dirty:0kB Writeback:0kB Slab:12292kB SReclaimable:2632kB SUnreclaim:9660kB 
+cpu cpu  1208123 0 1157305 12211981 0 0 1552498 0 0 0
+intr_total=254455228
+ctxt 67933008
+processes 3023855
+uhttpd pid=7737 rss_kb=NA ticks=NA
+rpcd pid=2247 rss_kb=692 ticks=189
+dnsmasq pid=3429 rss_kb=1072 ticks=21
+dropbear pid=3812 rss_kb=668 ticks=14
+gcom pid=2617 rss_kb=1408 ticks=165080
+pingcheck pid=4448 rss_kb=508 ticks=1303
+cmagent pid=6889 rss_kb=3208 ticks=191
+cmsd pid=7791 rss_kb=NA ticks=NA
+mosquitto pid=3911 rss_kb=2180 ticks=13503
+umdns pid=3928 rss_kb=1736 ticks=4609
+hcshd pid=7813 rss_kb=NA ticks=NA
+hyfibr pid=2297 rss_kb=424 ticks=1232
+softapd pid=2262 rss_kb=1800 ticks=79307
+netifd pid=2468 rss_kb=484 ticks=2877
+odhcpd pid=4426 rss_kb=592 ticks=2816
+cron pid=3455 rss_kb=808 ticks=0
+Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+  ifb0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+   ra2:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  gre0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+eth0.1: 2508209149 5375132    0  160    0     0          0    249477 9839466269 15902850    0    0    0     0       0          0
+    lo:  849307   10877    0    0    0     0          0         0   849307   10877    0    0    0     0       0          0
+  usb0: 10027927256 9029316    0  965    0     0          0         0 1833154509 4352832    0    0    0     0       0          0
+   ra1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+gretap0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  rai2:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+   ra0: 1732063341 66714270 1464   57    0     0          0    287915 151987368 34524499    0    0    0     0       0          0
+  rai1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  eth0: 2621044787 5652414    0    2    0     0          0         0 1313038117 15902736    0    0    0     0       0          0
+  ifb1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  rai0: 1758029085 22607343 46291  140    0     0          0         0 780246245 45652748    0    0    0     0       0          0
+apcli0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+ip6tnl0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+br-lan: 2282366890 5087217    0  145    0     0          0         0 10402659049 9339508    0    0    0     0       0          0
+apclii0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+[top]
+Mem: 63748K used, 58972K free, 772K shrd, 4904K buff, 11612K cached
+CPU:   0% usr   9% sys   0% nic  90% idle   0% io   0% irq   0% sirq
+Load average: 0.41 0.36 0.36 1/70 7859
+  PID  PPID USER     STAT   VSZ %VSZ %CPU COMMAND
+ 6889     1 root     S     4144   3%   0% /usr/sbin/cmagent -m router -b 127.0.0.1 -p 8883 -a -t 30
+ 2617     1 root     S     3820   3%   0% /usr/bin/gcom
+ 2262     1 root     S     3676   3%   0% /usr/sbin/softapd
+10711     1 root     S     3512   3%   0% /usr/sbin/uhttpd -f -h /www -r LT500D -x /cgi-bin -u /ubus -t 60 -T 30 -k 20 -A 1 -n 3 -N 100 -p 0.0.0.0:80 -p [::]:80 -C /etc/uhttpd.crt -K /etc/uhttpd.key -s 0.0.0.0:443 -s [::]:443
+ 3911     1 mosquitt S     3316   3%   0% mosquitto -c /etc/mosquitto/mosquitto.conf
+ 3928     1 root     S     3068   2%   0% /usr/sbin/umdns
+28559     1 root     S     1688   1%   0% /sbin/logd -S 530
+ 2468     1 root     S     1684   1%   0% /sbin/netifd
+ 3429     1 dnsmasq  S     1628   1%   0% /usr/sbin/dnsmasq -C /var/etc/dnsmasq.conf.cfg02411c -k -x /var/run/dnsmasq/dnsmasq.cfg02411c.pid
+    1     0 root     S     1544   1%   0% /sbin/procd
+ 2247     1 root     S     1440   1%   0% /sbin/rpcd
+ 9264  2617 root     S     1424   1%   0% /bin/sh /usr/lib/4g/4gup.sh 4g
+ 4426     1 root     S     1424   1%   0% /usr/sbin/odhcpd
+ 4448     1 root     S     1324   1%   0% /usr/sbin/pingcheck
+28557 28556 root     S     1324   1%   0% logread
+ 2297     1 root     S     1300   1%   0% /usr/sbin/hyfibrd
+ 6562 32336 root     S     1196   1%   0% sh RE-PERFORMANCE-PROBE-01.sh
+ 7858  6562 root     R     1192   1%   0% top -bn1
+  418     1 root     S     1188   1%   0% /sbin/ubusd
+32336 32107 root     S     1188   1%   0% -ash
+ 3455     1 root     S     1188   1%   0% /usr/sbin/crond -f -c /etc/crontabs -l 5
+\n--- sample 5/6 Fri Sep 25 01:08:27 CEST 2026 ---
+load=0.38 0.35 0.35 1/69 7958
+MemFree:60264kB MemAvailable:66060kB Cached:11612kB SwapCached:600kB SwapFree:58528kB Dirty:0kB Writeback:0kB Slab:12292kB SReclaimable:2632kB SUnreclaim:9660kB 
+cpu cpu  1208182 0 1157388 12212410 0 0 1552529 0 0 0
+intr_total=254459337
+ctxt 67935965
+processes 3024081
+uhttpd pid=7963 rss_kb=NA ticks=NA
+rpcd pid=2247 rss_kb=692 ticks=189
+dnsmasq pid=3429 rss_kb=1072 ticks=21
+dropbear pid=3812 rss_kb=668 ticks=14
+gcom pid=2617 rss_kb=1408 ticks=165086
+pingcheck pid=4448 rss_kb=508 ticks=1303
+cmagent pid=6889 rss_kb=3208 ticks=191
+cmsd pid=8017 rss_kb=NA ticks=NA
+mosquitto pid=3911 rss_kb=2180 ticks=13503
+umdns pid=3928 rss_kb=1736 ticks=4610
+hcshd pid=8039 rss_kb=NA ticks=NA
+hyfibr pid=2297 rss_kb=424 ticks=1232
+softapd pid=2262 rss_kb=1800 ticks=79309
+netifd pid=2468 rss_kb=484 ticks=2877
+odhcpd pid=4426 rss_kb=592 ticks=2816
+cron pid=3455 rss_kb=808 ticks=0
+Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+  ifb0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+   ra2:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  gre0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+eth0.1: 2508272036 5375405    0  160    0     0          0    249501 9839651098 15903522    0    0    0     0       0          0
+    lo:  849307   10877    0    0    0     0          0         0   849307   10877    0    0    0     0       0          0
+  usb0: 10027943454 9029366    0  965    0     0          0         0 1833186640 4352878    0    0    0     0       0          0
+   ra1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+gretap0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  rai2:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+   ra0: 1732398982 66714949 1464   57    0     0          0    287935 151987634 34524503    0    0    0     0       0          0
+  rai1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  eth0: 2621113052 5652695    0    2    0     0          0         0 1313225634 15903408    0    0    0     0       0          0
+  ifb1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  rai0: 1758068239 22607715 46297  140    0     0          0         0 780464951 45653372    0    0    0     0       0          0
+apcli0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+ip6tnl0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+br-lan: 2282435980 5087329    0  145    0     0          0         0 10402679844 9339578    0    0    0     0       0          0
+apclii0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+[top]
+Mem: 62592K used, 60128K free, 776K shrd, 4904K buff, 11616K cached
+CPU:   0% usr   9% sys   0% nic  90% idle   0% io   0% irq   0% sirq
+Load average: 0.38 0.35 0.35 1/70 8085
+  PID  PPID USER     STAT   VSZ %VSZ %CPU COMMAND
+ 6889     1 root     S     4144   3%   0% /usr/sbin/cmagent -m router -b 127.0.0.1 -p 8883 -a -t 30
+ 2617     1 root     S     3820   3%   0% /usr/bin/gcom
+ 2262     1 root     S     3676   3%   0% /usr/sbin/softapd
+10711     1 root     S     3512   3%   0% /usr/sbin/uhttpd -f -h /www -r LT500D -x /cgi-bin -u /ubus -t 60 -T 30 -k 20 -A 1 -n 3 -N 100 -p 0.0.0.0:80 -p [::]:80 -C /etc/uhttpd.crt -K /etc/uhttpd.key -s 0.0.0.0:443 -s [::]:443
+ 3911     1 mosquitt S     3316   3%   0% mosquitto -c /etc/mosquitto/mosquitto.conf
+ 3928     1 root     S     3068   2%   0% /usr/sbin/umdns
+28559     1 root     S     1688   1%   0% /sbin/logd -S 530
+ 2468     1 root     S     1684   1%   0% /sbin/netifd
+ 3429     1 dnsmasq  S     1628   1%   0% /usr/sbin/dnsmasq -C /var/etc/dnsmasq.conf.cfg02411c -k -x /var/run/dnsmasq/dnsmasq.cfg02411c.pid
+    1     0 root     S     1544   1%   0% /sbin/procd
+ 2247     1 root     S     1440   1%   0% /sbin/rpcd
+ 9264  2617 root     S     1424   1%   0% /bin/sh /usr/lib/4g/4gup.sh 4g
+ 4426     1 root     S     1424   1%   0% /usr/sbin/odhcpd
+ 4448     1 root     S     1324   1%   0% /usr/sbin/pingcheck
+28557 28556 root     S     1324   1%   0% logread
+ 2297     1 root     S     1300   1%   0% /usr/sbin/hyfibrd
+ 6562 32336 root     S     1196   1%   0% sh RE-PERFORMANCE-PROBE-01.sh
+ 8084  6562 root     R     1192   1%   0% top -bn1
+  418     1 root     S     1188   1%   0% /sbin/ubusd
+32336 32107 root     S     1188   1%   0% -ash
+ 3455     1 root     S     1188   1%   0% /usr/sbin/crond -f -c /etc/crontabs -l 5
+\n--- sample 6/6 Fri Sep 25 01:08:33 CEST 2026 ---
+load=0.35 0.35 0.35 2/70 8238
+MemFree:57472kB MemAvailable:63268kB Cached:11620kB SwapCached:600kB SwapFree:58528kB Dirty:0kB Writeback:0kB Slab:12296kB SReclaimable:2632kB SUnreclaim:9664kB 
+cpu cpu  1208317 0 1157488 12212775 0 0 1552537 0 0 0
+intr_total=254462529
+ctxt 67939348
+processes 3024361
+uhttpd pid=8243 rss_kb=NA ticks=NA
+rpcd pid=2247 rss_kb=692 ticks=189
+dnsmasq pid=3429 rss_kb=1072 ticks=21
+dropbear pid=3812 rss_kb=668 ticks=14
+gcom pid=2617 rss_kb=1408 ticks=165091
+pingcheck pid=4448 rss_kb=508 ticks=1303
+cmagent pid=6889 rss_kb=3208 ticks=191
+cmsd pid=8297 rss_kb=NA ticks=NA
+mosquitto pid=3911 rss_kb=2180 ticks=13504
+umdns pid=3928 rss_kb=1736 ticks=4610
+hcshd pid=8319 rss_kb=NA ticks=NA
+hyfibr pid=2297 rss_kb=424 ticks=1232
+softapd pid=2262 rss_kb=1800 ticks=79315
+netifd pid=2468 rss_kb=484 ticks=2877
+odhcpd pid=4426 rss_kb=592 ticks=2816
+cron pid=3455 rss_kb=808 ticks=0
+Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+  ifb0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+   ra2:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  gre0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+eth0.1: 2508284935 5375489    0  160    0     0          0    249521 9839812753 15903863    0    0    0     0       0          0
+    lo:  849525   10880    0    0    0     0          0         0   849525   10880    0    0    0     0       0          0
+  usb0: 10027944027 9029378    0  965    0     0          0         0 1833187481 4352890    0    0    0     0       0          0
+   ra1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+gretap0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  rai2:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+   ra0: 1732762776 66715694 1464   57    0     0          0    287953 151987809 34524507    0    0    0     0       0          0
+  rai1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  eth0: 2621127463 5652779    0    2    0     0          0         0 1313388653 15903749    0    0    0     0       0          0
+  ifb1:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  rai0: 1758073146 22607753 46307  140    0     0          0         0 780679631 45653852    0    0    0     0       0          0
+apcli0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+ip6tnl0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+br-lan: 2282471090 5087421    0  145    0     0          0         0 10402708078 9339633    0    0    0     0       0          0
+apclii0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+[top]
+Mem: 64064K used, 58656K free, 784K shrd, 4904K buff, 11624K cached
+CPU:   0% usr   0% sys   0% nic 100% idle   0% io   0% irq   0% sirq
+Load average: 0.48 0.37 0.36 1/70 8365
+  PID  PPID USER     STAT   VSZ %VSZ %CPU COMMAND
+ 6889     1 root     S     4144   3%   0% /usr/sbin/cmagent -m router -b 127.0.0.1 -p 8883 -a -t 30
+ 2617     1 root     S     3820   3%   0% /usr/bin/gcom
+ 2262     1 root     S     3676   3%   0% /usr/sbin/softapd
+10711     1 root     S     3512   3%   0% /usr/sbin/uhttpd -f -h /www -r LT500D -x /cgi-bin -u /ubus -t 60 -T 30 -k 20 -A 1 -n 3 -N 100 -p 0.0.0.0:80 -p [::]:80 -C /etc/uhttpd.crt -K /etc/uhttpd.key -s 0.0.0.0:443 -s [::]:443
+ 3911     1 mosquitt S     3316   3%   0% mosquitto -c /etc/mosquitto/mosquitto.conf
+ 3928     1 root     S     3068   2%   0% /usr/sbin/umdns
+28559     1 root     S     1688   1%   0% /sbin/logd -S 530
+ 2468     1 root     S     1684   1%   0% /sbin/netifd
+ 3429     1 dnsmasq  S     1628   1%   0% /usr/sbin/dnsmasq -C /var/etc/dnsmasq.conf.cfg02411c -k -x /var/run/dnsmasq/dnsmasq.cfg02411c.pid
+    1     0 root     S     1544   1%   0% /sbin/procd
+ 2247     1 root     S     1440   1%   0% /sbin/rpcd
+ 9264  2617 root     S     1424   1%   0% /bin/sh /usr/lib/4g/4gup.sh 4g
+ 4426     1 root     S     1424   1%   0% /usr/sbin/odhcpd
+ 4448     1 root     S     1324   1%   0% /usr/sbin/pingcheck
+28557 28556 root     S     1324   1%   0% logread
+ 2297     1 root     S     1300   1%   0% /usr/sbin/hyfibrd
+ 6562 32336 root     S     1196   1%   0% sh RE-PERFORMANCE-PROBE-01.sh
+ 8364  6562 root     R     1192   1%   0% top -bn1
+  418     1 root     S     1188   1%   0% /sbin/ubusd
