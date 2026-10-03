@@ -1,0 +1,999 @@
+CUDY LT500 V2 / R25 — FIRMWARE RE / ENG08 CONTINUATION HANDOFF
+=============================================================
+
+FONTOS: EZ EGY FOLYTATÁS, NEM ÚJ PROJEKT.
+
+Te vagy a következő RE/Firmware kolléga egy hosszú Cudy LT500 V2 / R25 firmware reverse-engineering projektben.
+
+A felhasználó a saját routerén dolgozik, adminisztrátori jogosultsággal. A cél egy működő, módosítható engineering firmware létrehozása, a Cudy hardveres működés és GUI/stack lehető legnagyobb megtartásával.
+
+A felhasználó magyarul kommunikál.
+Magyarul válaszolj.
+Legyél technikai, tömör, konkrét.
+NE ismételd újra a már lezárt reverse engineeringet.
+NE írj hosszú tervet actual tool work nélkül.
+Ha azt mondja „hajrá”, „folytasd”, „csináld”, akkor AZONNAL használj toolokat és dolgozz.
+Minden létrehozott fájlnév kötelezően `RE-` prefixszel kezdődjön.
+
+A felhasználó kifejezetten nem szereti, amikor az asszisztens azt mondja, hogy dolgozik, miközben valójában nem futtat semmit.
+
+=============================================================
+1. TARGET HARDVER
+=============================================================
+
+Eszköz:
+
+Cudy LT500 V2
+board ID: R25
+
+SoC:
+MediaTek MT7628AN
+
+RAM:
+128 MB DDR2
+
+Flash:
+16 MB SPI NOR
+
+Wi-Fi:
+2.4 GHz onboard MT7628 WMAC
+5 GHz PCIe MediaTek MT7663-family
+
+Cellular:
+Quectel EC25 family / USB / QMI
+
+Ethernet:
+MT7628 switch
+
+Gyári firmware:
+Cudy 2.4.16
+LEDE 17.01.5
+kernel 4.4.140
+
+Gyári firmware build:
+LT500V2-R25-2.4.16-20250804-150319
+
+=============================================================
+2. FONTOS INPUT FÁJLOK
+=============================================================
+
+A Project / conversation / /mnt/data környezetben keresd ezeket.
+
+EREDETI STOCK R25:
+
+`LT500V2-R25-2.4.16-20250804-150319-flash.bin`
+
+stock SHA256:
+
+57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6
+
+Egy második példány is lehet:
+
+`LT500V2-R25-2.4.16-20250804-150319-flash(2).bin`
+
+Stock kibontott rootfs:
+
+`squashfs-root-LT500V2-R25-2.4.16-20250804-150319-flash.zip`
+
+Régebbi LT500D donor:
+
+`squashfs-root-LT500D-OpenWrt_17.01.5 Cudy_2.4.16(3).zip`
+
+GPL forrás:
+
+`GPL_cudy_openwrt_MT7628_MT7621_20250724.gz`
+
+Ebben KERESD MEG KÜLÖN az R25 vendor DTS-t és minden cellular/GPIO/power vonatkozású forrást.
+
+-------------------------------------------------------------
+CUDY HIVATALOS INTERMEDIATE OPENWRT
+-------------------------------------------------------------
+
+Felhasználó feltöltötte:
+
+`LT500 V2.0_V3.0.zip`
+
+Ebben található a Cudy által aláírt:
+
+`openwrt-ramips-mt76x8-cudy_lt500-v2-squashfs-flash.bin`
+
+Ennek SHA256:
+
+3d8bb8eac7396f8263e90ecf14eca0f324ea6dbb295106e72b0a96753f31255b
+
+EZ KRITIKUS REFERENCIA.
+
+Ez egy valódi Cudy-signed full image, amelyet a stock Cudy GUI elfogad.
+
+A telepítési lánc ezért bizonyítottan:
+
+stock Cudy
+    ↓
+Cudy-signed LT500 V2 intermediate full image
+    ↓
+OpenWrt 23.05.5
+    ↓
+normál sysupgrade engineering image
+
+NE próbáld a módosított engineering sysupgrade image-et közvetlenül a stock Cudy GUI-ra feltölteni.
+A stock Cudy RSA ellenőrzés elutasítja.
+
+-------------------------------------------------------------
+ENG06 / ENG07
+-------------------------------------------------------------
+
+Korábbi engineering fájlok lehetnek:
+
+`RE-LT500V2-R25-ENG06-CHECKPOINT.zip`
+
+`RE-LT500V2-R25-ENG06-sysupgrade.bin`
+
+`RE-LT500V2-R25-ENG06-README.md`
+
+`RE-LT500V2-R25-ENG06-root-password.txt`
+
+`RE-LT500V2-R25-ENG07-router-safe-sysupgrade.bin`
+
+`RE-LT500V2-R25-ENG07-router-safe-artifact.zip`
+
+`RE-LT500V2-R25-ENG07-router-safe-512K-artifact.zip`
+
+Legutóbbi fizikai candidate:
+
+`RE-LT500V2-R25-ENG07-PHYSICAL-CANDIDATE-01.bin`
+
+SHA256:
+
+67b7a5ef5ea3d0bebb5959d3ae7056d239323dd7fbfb7b939c60a6e5c16b1b52
+
+Preflight:
+
+`RE-LT500V2-R25-ENG07-PHYSICAL-PREFLIGHT-04.sh`
+
+Csomag:
+
+`RE-LT500V2-R25-ENG07-PHYSICAL-CANDIDATE-01.zip`
+
+-------------------------------------------------------------
+ENG08
+-------------------------------------------------------------
+
+A felhasználó legutóbbi információja:
+
+„ENG08 sysupgrade de nem jo a 4g antenna...”
+
+TEHÁT:
+
+az ENG08 / következő engineering build már eljutott olyan állapotba, hogy a felhasználó 4G oldali hibát észlelt.
+
+DE:
+
+a jelenlegi handoffban NINCS biztosan azonosított ENG08 bin SHA256 vagy pontos fájlnév.
+
+NE TALÁLD KI.
+
+Első lépésként:
+
+- keresd meg conversation / Project / Library / /mnt/data alatt az ENG08 fájlt;
+- ha létezik, az legyen a közvetlen runtime-failure baseline;
+- ha nincs, a legutolsó működő ENG07 + stock R25 + Cudy intermediate összevetésből építs következő ENG08 fix candidate-et.
+
+=============================================================
+3. CUDY FULL IMAGE RSA FORMÁTUM — EZ MÁR BIZONYÍTOTT
+=============================================================
+
+A stock és az intermediate full image struktúrája:
+
+0x000000–0x02ffff
+U-Boot / bootloader terület
+
+0x030000–0x0300ff
+256 byte Cudy RSA-2048 signature
+
+0x030100–0x04ffff
+padding
+
+0x050000
+legacy uImage kezdet
+
+uImage magic:
+
+27 05 19 56
+
+uImage name:
+
+R25
+
+Az intermediary image Cudy RSA signature ellenőrzése sikeresen reprodukálva lett.
+
+A Cudy signature:
+
+RSA-2048
+PKCS#1 v1.5
+SHA-1
+
+A signature által védett adat:
+
+SHA1(
+    image[0x000000:0x030000]
+    ||
+    image[0x050000:EOF]
+)
+
+Tehát:
+
+bootloader + firmware payload van aláírva.
+
+A signature blokk és a köztes padding nincs a hash inputban.
+
+A stock `/sbin/oem-check` ugyanazzal a Cudy publikus kulccsal ellenőrzi.
+
+A full-image Cudy RSA problémát NEM kell tovább reverse-engineerelni.
+
+LEZÁRT.
+
+=============================================================
+4. INTERMEDIATE OPENWRT 23.05.5 TRUTH
+=============================================================
+
+A Cudy-signed intermediary belseje:
+
+OpenWrt 23.05.5
+revision:
+
+r24106-10cc5fcd00
+
+kernel:
+
+Linux 5.15.167
+
+A build belső timestampje:
+
+2024-09-23
+
+A Cudy 2026-ban egy új signed/full-image envelope-pal publikálta ezt a régebbi OpenWrt buildet.
+
+Az intermediate OpenWrt rootfs-ben:
+
+`/sbin/oem-check`
+
+nincs jelen.
+
+A platform upgrade checker lényegében:
+
+platform_check_image() {
+    return 0
+}
+
+Ezért az intermediate után normál OpenWrt sysupgrade lehetséges.
+
+=============================================================
+5. SWITCH / DTS FONTOS ELTÉRÉS
+=============================================================
+
+A ténylegesen működő 2024-es Cudy intermediary build hardverleírását elsődleges BOOTABLE baseline-ként kezeld.
+
+A régi rootfs network mapping:
+
+cudy,lt500-v2)
+    ucidef_add_switch "switch0" \
+        "0:lan" "1:lan" "2:lan" "4:lan" "3:wan" "6@eth0"
+    ;;
+
+A beágyazott régi DTB-ben:
+
+mediatek,portmap = 0x17
+
+volt megfigyelve.
+
+EZZEL SZEMBEN:
+
+a jelenlegi 2026 OpenWrt upstream PR #24925 újabb hardverleírást használ.
+
+Ott:
+
+mediatek,portmap = <0x37>;
+mediatek,portdisable = <0x30>;
+
+és a board network mapping:
+
+"0:lan"
+"1:lan"
+"2:lan"
+"3:wan"
+"6@eth0"
+
+A PR szerint a 4-es switch portnak nincs fizikai connectora.
+
+FONTOS:
+
+ne keverd automatikusan a jelenlegi upstream DTS-t azzal a 2024-es image-dzsel, amely bizonyítottan bootolt a felhasználó routerén.
+
+A BOOTABILITY szempontjából:
+
+Cudy-signed 2024 intermediate > mai upstream feltételezés.
+
+=============================================================
+6. 5 GHz CALIBRATION ELTÉRÉS
+=============================================================
+
+Az új OpenWrt PR-ben szerepel:
+
+factory NVMEM:
+
+eeprom@0 {
+    reg = <0x0 0x400>;
+};
+
+eeprom@8000 {
+    reg = <0x8000 0x4da8>;
+};
+
+és:
+
+&pcie0 {
+    wifi@0,0 {
+        compatible = "mediatek,mt76";
+        ...
+        nvmem-cells = <&eeprom_factory_8000>,
+                      <&macaddr_bdinfo_de00 2>;
+        nvmem-cell-names = "eeprom", "mac-address";
+        ieee80211-freq-limit = <5000000 6000000>;
+    };
+};
+
+Ez az újabb upstream korrekció.
+
+A régebbi működő intermediary buildben ez nem feltétlenül volt így.
+
+NE változtasd ezt most automatikusan, mert az aktuális hiba 4G/cellular.
+
+=============================================================
+7. A MOSTANI FŐ HIBA: 4G / „ANTENNA”
+=============================================================
+
+A felhasználó ezt mondta:
+
+„ENG08 sysupgrade de nem jo a 4g antenna”
+
+Ezt NE értelmezd automatikusan szó szerinti antenna hardware-switch hibának.
+
+Először állapítsd meg, hogy a tünet valójában:
+
+- modem nem indul;
+- EC25 USB-n nem jelenik meg;
+- QMI interface nincs;
+- SIM/modem működik, de nincs RF;
+- van hálózat, de rossz signal/RSSI;
+- csak egy antenna path/diversity működik;
+- modem reset/power GPIO rossz állapotban van;
+- modem firmware/init parancs hiányzik;
+- Cudy signal parser/UI rosszul mutatja;
+- vagy valódi RF antenna/diversity konfigurációs hiba.
+
+NE TALÁLJ KI DIAGNÓZIST.
+
+=============================================================
+8. KRITIKUS 4G GPIO TRUTH
+=============================================================
+
+A 2026-os upstream OpenWrt LT500 V2 PR szerint:
+
+GPIO 38:
+
+`pwr`
+
+GPIO 3:
+
+`4g`
+
+DTS:
+
+gpio-export {
+    compatible = "gpio-export";
+
+    pwr {
+        gpio-export,name = "pwr";
+        gpio-export,output = <0>;
+        gpios = <&gpio 38 GPIO_ACTIVE_HIGH>;
+    };
+
+    usb4g {
+        gpio-export,name = "4g";
+        gpio-export,output = <0>;
+        gpios = <&gpio 3 GPIO_ACTIVE_HIGH>;
+    };
+};
+
+A PR leírás szerint ezek WWAN power/reset GPIO-k.
+
+Nagyon fontos:
+
+ACTIVE_HIGH deklaráció mellett a default output LOW.
+
+A PR szerint ez:
+
+powered / out-of-reset
+
+állapotot eredményez, és a Cudy GPL R25 DTS-hez igazodik.
+
+TEHÁT:
+
+NE állítsd automatikusan HIGH-ra ezeket.
+
+Először ellenőrizd a Cudy vendor R25 DTS-t.
+
+Különösen:
+
+GPIO3
+GPIO38
+
+és azok pinmuxját.
+
+A GPIO3 az MT7628 `i2s` pin group környékén van.
+
+GPIO38 a `wdt` pin group környékén.
+
+A pinctrl konfiguráció ezért KRITIKUS lehet.
+
+=============================================================
+9. KÖVETKEZŐ KONKRÉT FELADAT
+=============================================================
+
+A te AZONNALI feladatod:
+
+ENG08 4G hibájának root-cause elemzése és javított sysupgrade image készítése.
+
+NE kezdj általános GUI fejlesztésbe.
+
+NE dolgozz most VPN-en.
+
+NE dolgozz most Dashboardon.
+
+NE dolgozz most Developer UI-n.
+
+NE nyúlj U-Boothoz.
+
+A 4G működés legyen először stock-parity.
+
+=============================================================
+10. KÖTELEZŐ STATIKUS ÖSSZEHASONLÍTÁS
+=============================================================
+
+Hasonlítsd össze legalább:
+
+A)
+stock R25 firmware
+
+B)
+Cudy-signed intermediary OpenWrt
+
+C)
+ENG07
+
+D)
+ENG08, ha megtalálható
+
+Különösen:
+
+kernel/uImage
+
+DTB
+
+GPIO
+
+pinmux
+
+USB host controller
+
+USB power/reset
+
+EC25 USB VID/PID support
+
+qmi_wwan
+
+cdc_wdm
+
+usbserial
+
+option
+
+Quectel initialization
+
+network config
+
+hotplug
+
+procd/init
+
+cellular scripts
+
+gcom
+
+mcore
+
+cmagent
+
+pingcheck
+
+4gup.sh
+
+modem startup
+
+SIM detect
+
+signal parsing
+
+WWAN network ownership.
+
+=============================================================
+11. GPL R25.DTS
+=============================================================
+
+A GPL archive-ban keresd meg az EXACT:
+
+R25.dts
+
+vagy R25 board-specifikus DTS/DTSI fájlt.
+
+NE egy másik Cudy boardból másolj automatikusan.
+
+Ebből dokumentáld pontosan:
+
+GPIO3 funkció
+GPIO38 funkció
+gpio polarity
+default state
+pinctrl group
+USB controller
+PCIe
+Ethernet switch
+LED GPIO
+reset GPIO
+WWAN control
+factory partition
+bdinfo partition.
+
+A vendor GPL R25 DTS elsőbbséget élvez az upstream feltételezéssel szemben, ha az upstream még review alatt van.
+
+=============================================================
+12. STOCK CUDY CELLULAR STACK
+=============================================================
+
+A stock rootfs-ben célzottan keress:
+
+`/etc/init.d/*`
+
+`/etc/hotplug.d/*`
+
+`/usr/bin/*`
+
+`/usr/sbin/*`
+
+`/usr/lib/*`
+
+`/usr/lib/lua/luci/*`
+
+valamint minden olyan scriptet, amelyben előfordul:
+
+4g
+wwan
+EC25
+quectel
+qmi
+cdc-wdm
+usb
+gpio
+pwr
+reset
+antenna
+diversity
+signal
+csq
+qeng
+cfun
+sim
+gcom
+mcore
+cmagent
+
+Keresd külön:
+
+AT+CFUN
+AT+CSQ
+AT+QENG
+AT+QCFG
+
+de NE feltételezd, hogy antenna selection AT paranccsal történik.
+
+Csak akkor állíts ilyet, ha exact donor evidence van.
+
+=============================================================
+13. RUNTIME DIAGNOSZTIKA
+=============================================================
+
+Ha a felhasználó routere ENG08-on fut és további adat kell, először READ-ONLY diagnosztikát adj.
+
+NE flashelj újra vakon.
+
+Hasznos read-only ellenőrzések lehetnek:
+
+ubus call system board
+
+cat /proc/mtd
+
+dmesg
+
+lsusb
+
+ls -l /dev/cdc-wdm*
+
+ls -l /dev/ttyUSB*
+
+ip link
+
+ip addr
+
+ubus call network.interface dump
+
+uci show network
+
+cat /sys/kernel/debug/gpio
+
+vagy új kernel esetén megfelelő gpiochip/gpiod adatok
+
+ls /sys/class/gpio
+
+mmcli -L
+
+mmcli -m 0
+
+qmicli --device=/dev/cdc-wdm0 ...
+
+ha az adott tool telepítve van.
+
+A lényeg:
+
+először különítsd el:
+
+POWER/RESET
+USB ENUMERATION
+MODEM DRIVER
+QMI SESSION
+RF/SIGNAL
+ANTENNA
+
+hibarétegeket.
+
+=============================================================
+14. ENG06 FONTOS TAPASZTALAT
+=============================================================
+
+Az ENG06 első fizikai flash után:
+
+static red LED
+no LAN link
+no ping
+
+állapot lett.
+
+A router NEM halt meg.
+
+A felhasználó Cudy TFTP recovery-vel visszaállította a gyári firmware-t.
+
+A recovery út bizonyítottan működik.
+
+Ezért:
+
+a piros LED/no-LAN esetet NE ismételd.
+
+=============================================================
+15. ENG07 BUILD TANULSÁG
+=============================================================
+
+Az ENG06-nál volt hibás SquashFS/XZ fragment/extent kezelés.
+
+ENG07-nél teljes normális SquashFS rebuild történt.
+
+Volt sikeres build 512K XZ block size + always-use-fragments beállítással.
+
+Ezért:
+
+NE térj vissza az ENG06 veszélyes in-place compressed extent padding megoldásához.
+
+Ha csak kis 4G javítás kell:
+
+preferáld a jelenlegi BOOTOLÓ ENG08/ENG07 rootfs normális rebuildjét,
+
+ne régi sérülékeny compressed stream patchinget.
+
+=============================================================
+16. CUDY ENGINEERING PATCHSET — MIT KELL MEGTARTANI
+=============================================================
+
+A korábbi engineering build céljai:
+
+Dropbear retail gate eltávolítva.
+
+Stock:
+
+[ "$(bdinfo dbg)" == OK ] || return
+
+Telnet ugyanezzel gate-elve.
+
+Engineering cél:
+
+ne kelljen globális `bdinfo dbg`.
+
+FONTOS:
+
+globális Cudy debug módot NE állítsd OK-ra.
+
+Stock `/usr/libexec/login.sh`:
+
+[ "$(bdinfo dbg)" == OK ] && exec /bin/ash --login
+exec /bin/login
+
+Ha globális debug OK lenne, telnet/console passwordless ash-ba kerülhet.
+
+Ez NEM kívánt.
+
+A megfelelő engineering modell:
+
+global dbg OFF
+
+SSH/Dropbear gate külön eltávolítva
+
+normál authentication megmarad.
+
+=============================================================
+17. ROOT PASSWORD
+=============================================================
+
+Stock `/etc/uci-defaults/11_fix_passwd`:
+
+FUUID + HMAC alapján generál root passwordöt.
+
+Engineering image-ben ezt már neutralizáltuk.
+
+ENG06 temporary root password artifact létezett:
+
+`RE-LT500V2-R25-ENG06-root-password.txt`
+
+korábban:
+
+wiE1qkzbFQDARh0K84HTwi
+
+DE:
+
+ha új ENG08-at készítesz, dokumentáld külön az aktuális credential modellt.
+
+NE feltételezd automatikusan, hogy ugyanez a password van az ENG08-ban.
+
+=============================================================
+18. CWMP / CLOUD / OTA
+=============================================================
+
+Projekt firmware-policy:
+
+CWMP komponensek maradhatnak telepítve,
+de DEFAULT OFF.
+
+TR-069 NE kerüljön vissza normál UI funkcióként.
+
+Automatikus Cudy OTA:
+
+OFF.
+
+Manual update:
+
+maradhat.
+
+hcshd:
+
+bináris megmaradhat,
+de default daemon startup OFF.
+
+cmagent/cmsd/Mosquitto:
+
+ne töröld vakon,
+mert Cudy mesh/topology/network komponensek függhetnek tőlük.
+
+=============================================================
+19. U-BOOT
+=============================================================
+
+U-Boot recovery RSA-t NEM módosítjuk.
+
+Az eredeti recovery mechanizmus fontos biztonsági háló.
+
+NE írj U-Bootot.
+
+NE módosítsd:
+
+u-boot
+u-boot-env
+factory
+bdinfo
+
+partíciót engineering sysupgrade során.
+
+=============================================================
+20. STOCK R25 FLASH LAYOUT
+=============================================================
+
+Fontos layout:
+
+u-boot:
+0x000000
+size 0x30000
+
+u-boot-env:
+0x030000
+size 0x10000
+
+factory:
+0x040000
+size 0x10000
+
+firmware:
+0x050000
+size 0xf80000
+
+debug:
+0xfd0000
+size 0x10000
+
+backup:
+0xfe0000
+size 0x10000
+
+bdinfo:
+0xff0000
+size 0x10000
+
+Engineering sysupgrade:
+
+FIRMWARE partition payload legyen.
+
+NE full factory flash image-et írj firmware MTD-re.
+
+=============================================================
+21. METADATA / SYSUPGRADE
+=============================================================
+
+Korábbi stock-based ENG06 metadata:
+
+supported_devices=["R25"]
+
+LEDE 17.01.5
+
+Cudy 2.4.16
+
+A metadata-fixed ENG06 buildbe bekerült:
+
+R25
+és
+cudy,lt500-v2
+
+hogy az intermediate OpenWrt 23.05.5 `sysupgrade -T` elfogadja.
+
+Ez fontos.
+
+Az intermediary OpenWrt board identity:
+
+cudy,lt500-v2
+
+Ezért az ENG08 final sysupgrade metadata legyen kompatibilis:
+
+`R25`
+
+ÉS
+
+`cudy,lt500-v2`
+
+ha az intermediate-ről történik az első engineering flash.
+
+=============================================================
+22. ENG08 BUILD GATE
+=============================================================
+
+Mielőtt firmware-t adsz a felhasználónak:
+
+ellenőrizd ténylegesen:
+
+uImage magic
+
+uImage name = R25
+
+uImage header CRC
+
+uImage payload CRC
+
+kernel/rootfs offset
+
+SquashFS superblock
+
+SquashFS bytes_used
+
+rootfs fits firmware partition
+
+fwtool trailer
+
+fwtool CRC
+
+metadata JSON
+
+supported_devices
+
+device identity
+
+DTB
+
+GPIO3
+
+GPIO38
+
+USB host
+
+Quectel driver support
+
+init scripts syntax
+
+Dropbear behavior
+
+CWMP OFF
+
+automatic OTA OFF.
+
+NE mondj „kész” állapotot ezek nélkül.
+
+=============================================================
+23. FIZIKAI INSTALL FLOW
+=============================================================
+
+Biztonságos lánc:
+
+1.
+stock Cudy
+
+2.
+Cudy stock GUI-ból:
+
+`LT500 V2.0_V3.0.zip`
+
+belső signed full image telepítése
+
+3.
+boot:
+
+OpenWrt 23.05.5
+
+4.
+ellenőrzés:
+
+board = cudy,lt500-v2
+
+5.
+ENG08:
+
+először
+
+sysupgrade -T
+
+6.
+csak PASS után:
+
+sysupgrade -n ENG08.bin
+
+NE adj stock-GUI közvetlen ENG08 flash instrukciót.
+
+=============================================================
+24. CURRENT PRIORITY
+=============================================================
+
+A LEGFONTOSABB MOST:
+
+NEM új funkció.
+
+NEM OPKG.
