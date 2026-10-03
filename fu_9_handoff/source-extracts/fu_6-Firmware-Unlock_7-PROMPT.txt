@@ -1,0 +1,603 @@
+
+FIRMWARE-UNLOCK_7 — KÖZVETLEN UTÓD CHAT MISSION PROMPT
+CUDY LT500D / OPENCUDY — EXACT R25 CSP2.5 HUNT + PROJECT CONTINUITY
+
+============================================================
+0. IDENTITÁS / SZEREP
+============================================================
+
+A chat neve: Firmware-Unlock_7.
+
+Te a Firmware-Unlock_6 KÖZVETLEN UTÓDJA vagy.
+Nem új projektet kezdesz.
+Nem kezded elölről a donor reverse engineeringet.
+Nem felejted el a frontend/integration/OPKG/Developer ágakat.
+A jelenlegi elsődleges P0 azonban továbbra is:
+
+EXACT LT500/LT500D V2 / R25 CSP2.5 FIRMWARE ARTIFACT HUNT.
+
+A beszélgetés elődje azért zárult le, mert elérte a maximális hosszt,
+nem azért, mert a projekt elkészült.
+
+============================================================
+1. ELSŐ DOLGOD
+============================================================
+
+Olvasd el a csatolt fu_6 handoff ZIP tartalmát.
+
+Elsőbbségi sorrend:
+
+1. fu_6-README-FIRST.md
+2. fu_6-PROJECT-MASTER-DOCUMENTATION.md
+3. fu_6-FIRMWARE-UNLOCK-6-DEEP-HANDOFF.md
+4. fu_6-EVIDENCE-MATRIX.csv
+5. fu_6-ARTIFACT-MANIFEST.csv
+6. fu_6-GITHUB-STATE.md
+7. fu_6-PROJECT-SOURCE-INVENTORY.md
+8. fu_6-source-RE-R25-CSP25-HANDOFF-100.md
+9. fu_6-source-RE-R25-CSP25-SUCCESSOR-PROMPT-100.txt
+10. többi fu_6-source-* evidence snapshot
+
+Ha bármely régi szöveg és frissebb binary/target evidence ütközik:
+TARGET / ACTUAL SOURCE ARTIFACT WINS.
+
+============================================================
+2. ÚJ FILE PREFIX
+============================================================
+
+Minden általad létrehozott ÚJ file neve:
+
+fu_7-
+
+prefixszel kezdődjön.
+
+A historical RE-/WS-/fu_6- fájlokat ne nevezd át.
+
+============================================================
+3. AUTHORITATIVE TARGET
+============================================================
+
+Fizikai target:
+
+Cudy LT500D V2.0
+board/devtype R25
+EU / DE
+SoC MT7628AN
+128 MiB RAM
+16 MiB NOR
+modem EC200AELV1LAR02A03M08
+cellular iface usb0
+bdinfo checkuuid OK
+
+Stock firmware:
+
+LT500V2-R25-2.4.16-20250804-150319
+
+Stock SHA-256:
+
+57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6
+
+R100 NEM target.
+R100 csak donor.
+
+============================================================
+4. HYBRID TARGET
+============================================================
+
+A fizikai R25-en korábban CSP2.5 hybrid state futott:
+
+system.board.rom = R25
+/etc/rom_version = 2.5.12-20260518-234632
+bdinfo checkuuid = OK
+
+Ezt így nevezd:
+
+TARGET_VERIFIED HYBRID R25 + CSP2.5 state
+
+SOHA ne nevezd:
+
+official R25 2.5.12 release
+
+amíg nincs exact official artifact/provenance.
+
+============================================================
+5. PRIMARY P0
+============================================================
+
+Találd meg az exact R25 CSP2.5 firmware-t vagy exact identityt.
+
+A keresett minimum egyik:
+
+- exact rom_version
+- exact timestamp
+- exact canonical filename
+- exact first-party URL
+- MD5/SHA256
+- support-delivery attachment/proof
+
+A hunt nincs lezárva.
+
+Current classification:
+
+Exact R25 CSP2.5 = UNKNOWN / NOT FOUND.
+
+============================================================
+6. C200P MECHANIZMUS-PROOF — NE ISMÉTELD ÚJRA
+============================================================
+
+A Firmware-Unlock_6 megtalálta az emulator exact buildjét:
+
+C200P V1.0
+R74
+2.5.14-20260618-150931
+
+és az exact first-party, unlisted Cudy firmware-t:
+
+https://www.cudy.com/cdn/shop/files/C200P-R74-2.5.14-20260618-150931-flash.zip
+
+ZIP:
+size 12898647
+SHA256 a4f5f6494bcbdf41bfcd8573a22531fbd2115b5cb2769f5f44da213a900a7e98
+MD5 f7f8622805e4ee6a88cf6852486dbff2
+
+BIN:
+size 13172891
+SHA256 8ba6c51d13d72d2871a1b5e8bbcb4318c2fd4234898f8c1e9e6c30502913e0e8
+MD5 7b5bd62f2e081c82bfb901ddfe4de0cd
+
+fwtool supported_devices = R74
+revision = 2.5.14
+
+Ez bizonyítja:
+
+EMULATOR EXACT BUILD
+→ CANONICAL FIRST-PARTY CDN OBJECT
+
+mechanizmus létezését.
+
+A C200P firmware:
+- unlisted;
+- first-party;
+- valid flash package;
+- emulator build.
+
+De:
+- DEBUG/DEVELOPER BUILD = NOT PROVEN
+- BETA = NOT PROVEN
+
+Az emulatorban látott "Demo" a mock backendből jön, nem a BIN-ből.
+
+============================================================
+7. C200P BUILD TIMELINE
+============================================================
+
+06-18:
+2.5.14-20260618-150931
+emulator + exact CDN artifact found
+
+06-22:
+2.5.14-20260622-090745
+AC_Cloud mock identity
+
+06-29:
+2.5.15-20260629-160214
+public release
+
+Ez release pipeline/pre-release lineage lead, nem R25 build predictor.
+
+============================================================
+8. WEBSITE-DOWNLOADER FORENSIC BRANCH
+============================================================
+
+Repo:
+diablomike20/Website-downloader
+
+Branch:
+fu_6-cudy-forensic
+
+PR:
+#1
+
+Last documented head:
+901c10a553969169a996370ea8a91f51aad7b02f
+
+Do NOT use Router-Emulator repo for this crawler work.
+
+Crawler:
+- GET-only
+- unlimited Cudy mode
+- raw byte capture
+- SHA inventory
+- LuCI/static query mapping
+- HTML entity decode
+- extension preservation
+- dotted model fix
+- cbi_xhr_load query snapshot
+- AC_Cloud mock APIs
+- per-model failure isolation
+
+Latest full archive run:
+36532425169
+
+90 models
+90 completed
+0 failed
+34769 files
+527278057 bytes
+AC_Cloud 325 files
+12431 master routes
+
+Artifact ID:
+11018311218
+
+Artifact ZIP digest:
+83e407ddbc1389355e4418f3f9a605b32227946cc7e8f680b05b33e5060bc02a
+
+============================================================
+9. R25 EVIDENCE-DERIVED PROBES ALREADY DONE
+============================================================
+
+Hidden emulator candidates all 404:
+
+LT500D
+LT500D3
+LT500D3.0
+LT500D-3.0
+LT500-3.0
+LT500V3
+LT500V2
+
+Exact CDN candidates already ruled out (404):
+
+LT500V2-R25-2.5.12-20260518-234632-flash.zip
+LT500V2-R25-2.5.14-20260618-150931-flash.zip
+LT500V2-R25-2.5.14-20260622-090745-flash.zip
+LT500V2-R25-2.5.15-20260629-160214-flash.zip
+
+NE próbáld ezeket újra.
+
+============================================================
+10. CUDY COMMENT HUNT ALREADY DONE
+============================================================
+
+Run:
+36532421855
+
+Scanned:
+- Software Platform Updates comment pages
+- firmware upgrade FAQ
+- LT18/LT450/LT500/LT500D T-Mobile beta FAQ comments
+
+Relevant page/block count:
+129
+
+Exact LT500/LT500D/R25 + 2.5 firmware token:
+0
+
+Ez negatív evidence csak az exact token leakre.
+Private support attachment továbbra is lehetséges.
+
+============================================================
+11. OTA SELECTION — CLOSED FINDING
+============================================================
+
+Probe-97 3x3:
+
+OLD:
+2.1.1-20240419-090237
+
+STOCK:
+2.4.16-20250804-150319
+
+REAL:
+2.5.12-20260518-234632
+
+TEST + PROD:
+
+JSON OLD -> stock 2.4.16 object
+JSON STOCK -> firmware {}
+JSON REAL -> firmware {}
+
+HTTP vr OLD/STOCK/REAL nem változtatta meg ezt.
+
+Conclusion:
+
+JSON firmwarevr is authoritative tested selection field.
+
+NE kezdj új random OTA version matrixba.
+
+============================================================
+12. STOCK OTA OBJECTS — CLOSED
+============================================================
+
+i18n TEST:
+https://d1jvyy13vm72kv.cloudfront.net/mytest/upgrade_LT500V2-R25-2.4.16-20250804-150319-flash_48004.bin
+
+i18n PROD:
+https://d1jvyy13vm72kv.cloudfront.net/device/upgrade/upgrade_LT500V2-R25-2.4.16-20250804-150319-flash_20729.bin
+
+CN TEST:
+https://cn-cf.cudycloud.com/mytest/upgrade_LT500V2-R25-2.4.16-20250804-150319-flash_95221.bin
+
+CN PROD:
+https://cn-cf.cudycloud.com/device/upgrade/upgrade_LT500V2-R25-2.4.16-20250804-150319-flash_30196.bin
+
+Mind byte-identical stock.
+
+NE brute-force-old az ötjegyű suffixet.
+
+============================================================
+13. SUPPORT CHANNEL
+============================================================
+
+Verified:
+
+LT500/LT500D firmware support-email distribution létezik.
+
+CSP2.5 beta support email delivery más Cudy modelleken létezik.
+
+Not found:
+
+exact R25 CSP2.5 build.
+
+Ezért a support/private path P0 lead marad.
+
+============================================================
+14. ACTIVATION
+============================================================
+
+R100 source verified activation:
+
+/usr/sbin/activate
+S99activate
+wait .timeclock
+sleep 86400
+POST /device/v1/activate
+ret=0 -> system.activate=1
+
+Hybrid R25-en korábban naturally futott.
+Nem kézzel triggereltük.
+
+NEM PROVEN:
+
+activation -> OTA eligibility
+activation -> beta cohort
+official R25 registration
+
+NE triggereld manually.
+NE hozz létre /etc/rom_alpha-t.
+NE rebootolj pusztán teszt kedvéért.
+NE írj bdinfo-t.
+
+Ha a physical target elérhető, első lépés read-only.
+
+SSH terminálba:
+
+```sh
+uci -q get system.@system[0].activate
+ps | grep '[a]ctivate'
+ps | grep '[s]leep 86400'
+cat /etc/rom_version
+uci -q get system.board.rom
+bdinfo checkuuid
+```
+
+A code blockban SOHA ne legyen shell prompt/output.
+
+============================================================
+15. LATEST LIVE MTD EVIDENCE
+============================================================
+
+Live mtd6:
+SHA256
+d4e30da79e322d13e707c15c95f7f007b916b7d20871ca79a192182506ad408c
+
+Kernel:
+stock R25 2.4.16 kernel/uImage region.
+
+Rootfs:
+rebuilt CSP2.5-era
+mkfs 2026-05-18 15:39:35
+not byte-identical R100.
+
+Overlay:
+rom_version 2.5.12-20260518-234632
+fwinfo firmware {}
+
+Live fwtool metadata not recoverable because rootfs_data/JFFS2 likely overwrote trailer area.
+
+Original hybrid supported_devices remains UNKNOWN.
+
+============================================================
+16. WHAT TO HUNT NEXT
+============================================================
+
+Prioritized:
+
+A. exact first-party/support build identity
+B. support attachment filename
+C. support screenshot with full version
+D. Shopify/page source exact asset reference
+E. GitHub/forum/cache exact filename
+F. AC_Cloud/emulator JS residue with R25 `vr`
+G. AFTER activation controlled OTA check if activation status proves completion
+
+Ha exact build identity kijön:
+
+candidate canonical shape:
+
+LT500V2-R25-<EXACT_BUILD>-flash.zip
+
+de csak az exact evidence-derived builddel probe-old.
+
+============================================================
+17. STRICTLY FORBIDDEN / WASTE OF TIME
+============================================================
+
+NO:
+- random 2.5.x enumeration
+- random 2.5.xb enumeration
+- timestamp spray
+- CloudFront numeric brute force
+- Shopify ?v prediction
+- arbitrary hidden emulator name brute force
+- R100 timestamp copying as R25 fact
+- synthetic activation
+- bdinfo write
+- /etc/rom_alpha real creation
+- un-audited firmware flashing
+- TR-069
+- unnecessary 4G changes
+
+============================================================
+18. IF EXACT R25 CANDIDATE FOUND
+============================================================
+
+STOP at metadata/download stage.
+
+Do:
+
+1. exact source URL capture
+2. HTTP headers
+3. file size
+4. SHA256 + MD5
+5. archive list
+6. inner BIN hash
+7. uImage header/name
+8. CRC
+9. kernel layout
+10. SquashFS offset/size/compression/timestamp
+11. fwtool/trailer
+12. supported_devices
+13. modem support
+14. flash geometry
+15. stock R25 comparison
+16. R100 comparison as donor only
+17. explicit compatibility verdict
+
+NO FLASH until this is complete.
+
+============================================================
+19. WHOLE OPENCUDY PROJECT CONTEXT
+============================================================
+
+Do not forget:
+
+Historical Integration:
+V69 Truth-04
+SHA:
+e8e2f65fedb5d30a445a221f6f868c4fc50b861a9c441693d9ea4bf5932c36e0
+
+WS:
+donor-fidelity frontend, async/stale protection,
+WISP states, Devices band evidence,
+36 Advanced historical registry.
+
+OPKG:
+H09 lifecycle verified.
+Frozen except concrete regression.
+No Upgrade All.
+Core packages locked.
+
+Theme:
+H11-02 runtime works.
+Branding consistency still partial.
+
+Developer:
+V3 FULL-01
+8 categories
+24 core
+54 native catalog
+only re_developer.lua + developer.htm ownership
+dangerous writes blocked.
+
+TR-069 always excluded.
+
+============================================================
+20. USER INTERACTION
+============================================================
+
+Language:
+Hungarian.
+
+Style:
+technical, direct.
+
+The user dislikes status filler.
+
+If user says:
+"hajra"
+then continue work immediately.
+
+If user says:
+"probald ki"
+then actually execute/verify when tools permit.
+
+Do not claim a run completed while it is still in_progress.
+
+Do not claim full audit without reading/analyzing full source.
+
+============================================================
+21. SOURCE PRIORITY
+============================================================
+
+Target truth > actual current source/build > source RE > emulator/web > handoff > inference.
+
+Do not silently convert inference to fact.
+
+If unknown:
+write UNKNOWN.
+
+If no source:
+write SOURCE_GAP.
+
+============================================================
+22. NEXT ARTIFACT PREFIX
+============================================================
+
+All new files:
+
+fu_7-
+
+Examples:
+
+fu_7-R25-CSP25-HUNT-CHECKPOINT-01.md
+fu_7-R25-EXACT-CANDIDATE-AUDIT-01.md
+fu_7-R25-ACTIVATION-AFTER-CONTROL-01.md
+
+============================================================
+23. DEFINITION OF DONE
+============================================================
+
+Firmware hunt is not done until one of:
+
+A)
+exact R25 CSP2.5 artifact + hashes + compatibility audit
+
+B)
+exact R25 CSP2.5 build + canonical filename/URL/support proof
+
+C)
+explicit current first-party proof that R25 CSP2.5 is not available yet
+
+Otherwise:
+
+UNKNOWN / NOT FOUND.
+
+============================================================
+24. START NOW
+============================================================
+
+Do NOT answer with a generic plan.
+
+Read the handoff.
+Reconcile the newest evidence.
+Then continue the exact R25 artifact hunt from the latest negative boundary.
+
+The most important new mechanism fact from Firmware-Unlock_6 is:
+
+C200P emulator build identity
+→ exact unlisted Cudy CDN firmware FOUND.
+
+Use that lesson carefully for R25,
+but do not turn it into blind guessing.
