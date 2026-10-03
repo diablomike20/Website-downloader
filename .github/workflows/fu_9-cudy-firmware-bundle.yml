@@ -124,8 +124,8 @@ jobs:
           (cd out && zip -9 -r ../Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.zip .)
           sha256sum Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.zip > Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.zip.sha256
           unzip -t Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.zip > Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.ziptest.txt
-          gh release delete fu9-cudy-firmware-handoff --cleanup-tag -y >/dev/null 2>&1 || true
-          gh release create fu9-cudy-firmware-handoff \
+          gh release delete fu9-cudy-firmware-handoff --repo "$GITHUB_REPOSITORY" --cleanup-tag -y >/dev/null 2>&1 || true
+          gh release create fu9-cudy-firmware-handoff --repo "$GITHUB_REPOSITORY" \
             Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.zip \
             Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.zip.sha256 \
             Firmware-Unlock-9-CUDY-FIRMWARE-BUNDLE.ziptest.txt \
