@@ -36,6 +36,20 @@ PAGES=[
  "https://www.cudy.com/pages/download-center/wr1200-1-0",
  "https://www.cudy.com/pages/download-center/wr1200-2-0",
  "https://www.cudy.com/pages/download-center/wr1200-3-0",
+ "https://www.cudy.com/pages/download-center/wr1300-1-0",
+ "https://www.cudy.com/pages/download-center/wr1300-2-0",
+ "https://www.cudy.com/pages/download-center/wr1300-3-0",
+ "https://www.cudy.com/pages/download-center/lt300-2-0",
+ "https://www.cudy.com/pages/download-center/lt300-3-0",
+ "https://www.cudy.com/pages/download-center/lt15e-1-0",
+ "https://www.cudy.com/pages/download-center/lt15v-1-0",
+ "https://www.cudy.com/pages/download-center/lt12-1-0",
+ "https://www.cudy.com/pages/download-center/lt18-1-0",
+ "https://www.cudy.com/pages/download-center/lt700-1-0",
+ "https://www.cudy.com/pages/download-center/lt700-2-0",
+ "https://www.cudy.com/pages/download-center/lt700e-1-0",
+ "https://www.cudy.com/pages/download-center/lt500v-1-0",
+ "https://www.cudy.com/pages/download-center/lt400v-1-0",
 ]
 
 EXACT_URLS=[
@@ -47,7 +61,7 @@ EXACT_URLS=[
  "https://www.cudy.com/cdn/shop/files/LT400Outdoor-R40-1.15.34-20230525-155951-flash.zip",
  "https://www.cudy.com/cdn/shop/files/LT400Outdoor-R40-2.1.9-20240522-110221-flash.zip",
 ]
-FW_PREFIX=re.compile(r"(?i)^(LT400|LT450|LT500|WR1200)")
+FW_PREFIX=re.compile(r"(?i)^(LT300|LT400|LT450|LT500|LT700|LT12|LT15|LT18|WR1200|WR1300|WR3000|TR1200|P2)")
 CDN_RE=re.compile(r"""(?i)(?:https?:)?//(?:www\.)?cudy\.com/cdn/shop/files/[^"'<>\s]+?(?:\.zip|\.bin)(?:\?[^"'<>\s]*)?""")
 
 def fetch(url, timeout=90, binary=True):
@@ -87,6 +101,13 @@ def collect_official_urls():
                 fn=urllib.parse.unquote(urllib.parse.urlsplit(x).path.rsplit("/",1)[-1])
                 if FW_PREFIX.search(fn) and ("flash" in fn.lower() or fn.lower().endswith(".bin")):
                     urls.add(x)
+            # Shopify/download pages often expose the exact filename in text/JSON
+            # without a direct href. Canonical /cdn/shop/files/<filename> is a
+            # proven Cudy distribution mechanism, so recover those names too.
+            for fn in re.findall(r"(?i)\\b([A-Za-z0-9_+().-]{3,180}(?:flash|sysupgrade)[A-Za-z0-9_+().-]*\\.(?:zip|bin))\\b",t):
+                fn=urllib.parse.unquote(fn)
+                if FW_PREFIX.search(fn):
+                    urls.add("https://www.cudy.com/cdn/shop/files/"+fn)
     (ROOT/"official-page-log.json").write_text(json.dumps(page_log,indent=2,ensure_ascii=False))
     return sorted(urls)
 
@@ -109,18 +130,25 @@ def download_latest_fu7_artifacts():
     token=os.environ.get("GH_TOKEN","")
     repo=os.environ.get("GITHUB_REPOSITORY","diablomike20/Website-downloader")
     if not token: return []
-    req=urllib.request.Request(
-        f"https://api.github.com/repos/{repo}/actions/artifacts?per_page=100",
-        headers={"Authorization":f"Bearer {token}","Accept":"application/vnd.github+json",
-                 "X-GitHub-Api-Version":"2022-11-28","User-Agent":UA})
+    arts=[]
     try:
-        with urllib.request.urlopen(req,timeout=60) as r: arts=json.load(r).get("artifacts",[])
+        for page in range(1,21):
+            req=urllib.request.Request(
+                f"https://api.github.com/repos/{repo}/actions/artifacts?per_page=100&page={page}",
+                headers={"Authorization":f"Bearer {token}","Accept":"application/vnd.github+json",
+                         "X-GitHub-Api-Version":"2022-11-28","User-Agent":UA})
+            with urllib.request.urlopen(req,timeout=60) as r:
+                batch=json.load(r).get("artifacts",[])
+            if not batch: break
+            arts.extend(batch)
+            if len(batch)<100: break
     except Exception as e:
-        print("ARTIFACT_LIST_FAIL",repr(e)); return []
+        print("ARTIFACT_LIST_FAIL",repr(e))
     arts=[a for a in arts if not a.get("expired")]
     arts.sort(key=lambda a:a.get("created_at",""),reverse=True)
     wanted=[
       "fu_7-CUDY-DEV-FIRMWARE-CLEAN-MASTER",
+      "fu_7-CUDY-DEV-FIRMWARE-MASTER",
       "fu_7-CUDY-DEV-BUILD-BATCH-01",
       "fu_7-CUDY-DEV-CDN-ARCHIVE-HUNT",
       "fu_7-RECOVERED-CUDY-BETAS",
