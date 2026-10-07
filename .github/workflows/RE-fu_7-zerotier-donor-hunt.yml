@@ -1,0 +1,69 @@
+name: RE FU_7 ZeroTier Donor Hunt
+
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - "scripts/RE_fu_7_zerotier_donor_hunt.py"
+      - ".github/workflows/RE-fu_7-zerotier-donor-hunt.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fu_7-cudy-cdn-index
+
+      - name: Install RE tooling
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools binutils file p7zip-full >/dev/null
+
+      - name: Run targeted ZeroTier donor hunt
+        run: python3 scripts/RE_fu_7_zerotier_donor_hunt.py
+
+      - name: Show ranking
+        if: always()
+        run: |
+          cat RE-ZEROTIER-DONOR-HUNT/RE-ZEROTIER-DONOR-HUNT-RESULT.md || true
+          echo "=== CSV ==="
+          cat RE-ZEROTIER-DONOR-HUNT/RE-ZEROTIER-DONOR-HUNT-RESULT.csv || true
+
+      - name: Upload hunt evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RE-ZEROTIER-DONOR-HUNT
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: warn
+          path: |
+            RE-ZEROTIER-DONOR-HUNT/RE-ZEROTIER-DONOR-HUNT-RESULT.*
+            RE-ZEROTIER-DONOR-HUNT/official-firmware-urls.txt
+            RE-ZEROTIER-DONOR-HUNT/found/**
+
+      - name: Publish small latest summary to branch
+        if: always()
+        shell: bash
+        run: |
+          set -e
+          mkdir -p RE-ZEROTIER-DONOR-HUNT-LATEST
+          cp RE-ZEROTIER-DONOR-HUNT/RE-ZEROTIER-DONOR-HUNT-RESULT.json RE-ZEROTIER-DONOR-HUNT-LATEST/ 2>/dev/null || true
+          cp RE-ZEROTIER-DONOR-HUNT/RE-ZEROTIER-DONOR-HUNT-RESULT.csv RE-ZEROTIER-DONOR-HUNT-LATEST/ 2>/dev/null || true
+          cp RE-ZEROTIER-DONOR-HUNT/RE-ZEROTIER-DONOR-HUNT-RESULT.md RE-ZEROTIER-DONOR-HUNT-LATEST/ 2>/dev/null || true
+          cp RE-ZEROTIER-DONOR-HUNT/official-firmware-urls.txt RE-ZEROTIER-DONOR-HUNT-LATEST/ 2>/dev/null || true
+          git config user.name "OpenCudy RE Bot"
+          git config user.email "73985391+diablomike20@users.noreply.github.com"
+          git add RE-ZEROTIER-DONOR-HUNT-LATEST
+          git diff --cached --quiet && exit 0
+          git commit -m "RE: publish latest ZeroTier donor hunt"
+          git push origin HEAD:fu_7-cudy-cdn-index
