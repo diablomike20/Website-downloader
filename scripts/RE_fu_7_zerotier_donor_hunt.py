@@ -160,6 +160,10 @@ def download_latest_fu7_artifacts():
         n=a.get("name","")
         if n in wanted and n not in used:
             chosen.append(a);used.add(n)
+    # FU7 handoff-proven clean firmware master. Keep as deterministic fallback
+    # while it remains available (30-day Actions retention).
+    if not any(int(a.get("id",0))==11068611598 for a in chosen):
+        chosen.append({"id":11068611598,"name":"fu_7-CUDY-DEV-FIRMWARE-CLEAN-MASTER-HANDOFF-ID"})
     out=[]
     for a in chosen:
         url=f"https://api.github.com/repos/{repo}/actions/artifacts/{a['id']}/zip"
