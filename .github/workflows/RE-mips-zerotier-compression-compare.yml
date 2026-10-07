@@ -1,0 +1,113 @@
+name: RE MIPS ZeroTier Compression Compare
+
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/RE-mips-zerotier-compression-compare.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: fu_7-cudy-cdn-index }
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools binutils unzip xz-utils >/dev/null
+      - shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p RE-MIPS-ZT-COMPARE
+          python3 - <<'PY'
+          import gzip,hashlib,json,os,re,subprocess,tarfile,urllib.request,zipfile,io
+          from pathlib import Path
+          out=Path("RE-MIPS-ZT-COMPARE")
+          urls={
+            "WR1300V1-R10-1.13.6":"https://www.cudy.com/cdn/shop/files/WR1300-R10-1.13.6-20220314-112409-flash_1.zip",
+            "R25-2.4.16":"https://www.cudy.com/cdn/shop/files/LT500V2-R25-2.4.16-20250804-150319-flash.zip",
+          }
+          needed_names=["zerotier-one","libstdc++.so.6","libminiupnpc.so.17","libnatpmp.so.1"]
+          def get(u):
+            req=urllib.request.Request(u,headers={"User-Agent":"Mozilla/5.0 OpenCudy-RE","Accept":"*/*"})
+            with urllib.request.urlopen(req,timeout=120) as r:return r.read()
+          def sha(b):return hashlib.sha256(b).hexdigest()
+          def find(root,n):
+            for p in root.rglob(n):
+              if p.is_file() or p.is_symlink():return p
+          def real(p):
+            if p.is_symlink():
+              q=(p.parent/os.readlink(p)).resolve()
+              return q if q.exists() else p
+            return p
+          res=[]
+          for idx,(tag,u) in enumerate(urls.items()):
+            b=get(u); z=out/f"{idx}.zip";z.write_bytes(b)
+            d=out/f"d{idx}";d.mkdir()
+            with zipfile.ZipFile(z) as q:q.extractall(d)
+            fw=next(p for p in d.rglob("*") if p.is_file() and p.suffix.lower()==".bin")
+            dat=fw.read_bytes();off=dat.find(b"hsqs")
+            sq=out/f"{idx}.sqfs";sq.write_bytes(dat[off:])
+            root=out/f"root{idx}"
+            subprocess.run(["unsquashfs","-no-progress","-d",str(root),str(sq)],check=True,
+                           stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            files=[]
+            for n in needed_names:
+              p=find(root,n)
+              if not p:continue
+              q=real(p);bb=q.read_bytes()
+              gz=gzip.compress(bb,compresslevel=9,mtime=0)
+              # xz only to understand theoretical compression; R26 runtime has no xz today.
+              xz=subprocess.run(["xz","-9e","-c"],input=bb,stdout=subprocess.PIPE,check=True).stdout
+              ss=subprocess.run(["strings","-a",str(q)],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True).stdout
+              v=sorted(set(re.findall(r"\b(?:0|1|2)\.\d+\.\d+\b",ss)))
+              files.append({"requested":n,"real_name":q.name,"size":len(bb),"sha256":sha(bb),
+                            "gzip9":len(gz),"xz9e":len(xz),"version_candidates":v[:30]})
+            # canonical deterministic tar of the 4 payload files, then gzip9
+            bio=io.BytesIO()
+            with tarfile.open(fileobj=bio,mode="w") as t:
+              for f in files:
+                q=find(root,f["requested"]);q=real(q)
+                ti=tarfile.TarInfo(f["requested"]); bb=q.read_bytes()
+                ti.size=len(bb);ti.mtime=0;ti.uid=0;ti.gid=0;ti.mode=0o644
+                t.addfile(ti,io.BytesIO(bb))
+            tar=bio.getvalue(); gz=gzip.compress(tar,compresslevel=9,mtime=0)
+            xz=subprocess.run(["xz","-9e","-c"],input=tar,stdout=subprocess.PIPE,check=True).stdout
+            res.append({"tag":tag,"source_url":u,"firmware":fw.name,"squashfs_offset":hex(off),
+                        "files":files,"logical_sum":sum(x["size"] for x in files),
+                        "tar_bytes":len(tar),"tar_gzip9":len(gz),"tar_xz9e":len(xz)})
+          (out/"RE-MIPS-ZEROTIER-COMPRESSION-COMPARE.json").write_text(json.dumps(res,indent=2))
+          md=["# MIPS ZeroTier compression compare","",
+              "| Donor | Logical | tar+gzip9 | tar+xz9e | zerotier SHA |",
+              "|---|---:|---:|---:|---|"]
+          for r in res:
+            z=next(x for x in r["files"] if x["requested"]=="zerotier-one")
+            md.append(f"| {r['tag']} | {r['logical_sum']} | {r['tar_gzip9']} | {r['tar_xz9e']} | \`{z['sha256']}\` |")
+          md += ["","## Files"]
+          for r in res:
+            md.append(f"### {r['tag']}")
+            for f in r["files"]:
+              md.append(f"- {f['requested']}: {f['size']} B; gzip9 {f['gzip9']} B; xz9e {f['xz9e']} B; SHA {f['sha256']}; version strings {f['version_candidates']}")
+          (out/"RE-MIPS-ZEROTIER-COMPRESSION-COMPARE.md").write_text("\n".join(md)+"\n")
+          print(json.dumps(res,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RE-MIPS-ZEROTIER-COMPRESSION-COMPARE
+          retention-days: 30
+          path: RE-MIPS-ZT-COMPARE/RE-MIPS-ZEROTIER-COMPRESSION-COMPARE.*
+      - shell: bash
+        run: |
+          mkdir -p RE-MIPS-ZT-COMPARE-LATEST
+          cp RE-MIPS-ZT-COMPARE/RE-MIPS-ZEROTIER-COMPRESSION-COMPARE.* RE-MIPS-ZT-COMPARE-LATEST/
+          git config user.name "OpenCudy RE Bot"
+          git config user.email "73985391+diablomike20@users.noreply.github.com"
+          git add RE-MIPS-ZT-COMPARE-LATEST
+          git diff --cached --quiet && exit 0
+          git commit -m "RE: publish MIPS ZeroTier compression comparison"
+          git push origin HEAD:fu_7-cudy-cdn-index
