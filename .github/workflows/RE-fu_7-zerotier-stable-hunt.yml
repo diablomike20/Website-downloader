@@ -1,0 +1,46 @@
+name: RE Cudy Stable ZeroTier Donor Hunt
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - "scripts/RE_fu_7_zerotier_stable_hunt.py"
+      - ".github/workflows/RE-fu_7-zerotier-stable-hunt.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fu_7-cudy-cdn-index
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools binutils file >/dev/null
+      - run: python3 scripts/RE_fu_7_zerotier_stable_hunt.py
+      - if: always()
+        run: cat RE-ZEROTIER-STABLE-HUNT/RE-ZEROTIER-STABLE-HUNT-RESULT.md || true
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RE-ZEROTIER-STABLE-HUNT
+          retention-days: 30
+          compression-level: 0
+          path: |
+            RE-ZEROTIER-STABLE-HUNT/RE-ZEROTIER-STABLE-HUNT-RESULT.*
+            RE-ZEROTIER-STABLE-HUNT/RE-STABLE-OFFICIAL-URLS.txt
+      - if: always()
+        shell: bash
+        run: |
+          set -e
+          mkdir -p RE-ZEROTIER-STABLE-HUNT-LATEST
+          cp RE-ZEROTIER-STABLE-HUNT/RE-ZEROTIER-STABLE-HUNT-RESULT.* RE-ZEROTIER-STABLE-HUNT-LATEST/ 2>/dev/null || true
+          cp RE-ZEROTIER-STABLE-HUNT/RE-STABLE-OFFICIAL-URLS.txt RE-ZEROTIER-STABLE-HUNT-LATEST/ 2>/dev/null || true
+          git config user.name "OpenCudy RE Bot"
+          git config user.email "73985391+diablomike20@users.noreply.github.com"
+          git add RE-ZEROTIER-STABLE-HUNT-LATEST
+          git diff --cached --quiet && exit 0
+          git commit -m "RE: publish stable-only ZeroTier donor hunt"
+          git push origin HEAD:fu_7-cudy-cdn-index
