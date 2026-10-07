@@ -1,0 +1,97 @@
+name: RE WR3000 Public ZeroTier Control
+
+on:
+  push:
+    branches: [fu_7-cudy-cdn-index]
+    paths:
+      - ".github/workflows/RE-wr3000-public-zerotier-control.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: fu_7-cudy-cdn-index }
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools binutils unzip >/dev/null
+      - shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p RE-WR3000-PUBLIC-ZT
+          python3 - <<'PY'
+          import hashlib,json,os,re,subprocess,urllib.request,zipfile
+          from pathlib import Path
+          out=Path("RE-WR3000-PUBLIC-ZT")
+          urls={
+            "2.3.7":"https://www.cudy.com/cdn/shop/files/WR3000-R31-2.3.7-20250117-181756-sysupgrade.zip?v=14859092184080051729",
+            "2.4.7":"https://www.cudy.com/cdn/shop/files/WR3000-R31-2.4.7-20250529-181923-sysupgrade.zip?v=18073092043682477939",
+          }
+          def get(u):
+            req=urllib.request.Request(u,headers={"User-Agent":"Mozilla/5.0 OpenCudy-RE","Accept":"*/*"})
+            with urllib.request.urlopen(req,timeout=120) as r:return r.read()
+          def sha(b):return hashlib.sha256(b).hexdigest()
+          res=[]
+          for ver,u in urls.items():
+            b=get(u); z=out/f"{ver}.zip";z.write_bytes(b)
+            d=out/ver;d.mkdir()
+            with zipfile.ZipFile(z) as q:q.extractall(d)
+            for fw in d.rglob("*"):
+              if not fw.is_file() or fw.suffix.lower() not in (".bin",".img",".trx",".itb"):continue
+              dat=fw.read_bytes(); off=dat.find(b"hsqs")
+              item={"version":ver,"url":u,"zip_size":len(b),"zip_sha256":sha(b),
+                    "firmware":fw.name,"firmware_size":len(dat),"firmware_sha256":sha(dat),
+                    "squashfs_offset":hex(off) if off>=0 else None,"zerotier":[]}
+              if off>=0:
+                sq=out/f"{ver}.sqfs";sq.write_bytes(dat[off:])
+                root=out/f"{ver}-root"
+                subprocess.run(["unsquashfs","-no-progress","-d",str(root),str(sq)],check=False,
+                               stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+                if root.exists():
+                  for p in root.rglob("zerotier-one"):
+                    if p.is_file():
+                      dyn=subprocess.run(["readelf","-d",str(p)],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True).stdout
+                      item["zerotier"].append({
+                        "path":str(p.relative_to(root)),"size":p.stat().st_size,
+                        "sha256":sha(p.read_bytes()),
+                        "needed":re.findall(r"Shared library: \[(.*?)\]",dyn)
+                      })
+                  # Also count framework references separately.
+                  refs=[]
+                  for p in root.rglob("*"):
+                    if p.is_file() and p.stat().st_size<5_000_000:
+                      try:
+                        s=subprocess.run(["strings","-a",str(p)],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True,timeout=5).stdout
+                      except:continue
+                      if "zerotier" in s.lower():refs.append(str(p.relative_to(root)))
+                  item["zerotier_reference_files"]=sorted(refs)
+              res.append(item)
+          (out/"RE-WR3000-PUBLIC-ZEROTIER-CONTROL.json").write_text(json.dumps(res,indent=2))
+          md=["# WR3000 public ZeroTier control",""]
+          for r in res:
+            md += [f"## {r['version']}",f"- Firmware: \`{r['firmware']}\`",f"- ZeroTier executable count: **{len(r['zerotier'])}**",
+                   f"- ZeroTier reference files: **{len(r.get('zerotier_reference_files',[]))}**"]
+            for z in r["zerotier"]:md.append(f"- zerotier-one: {z['size']} B / {z['sha256']} / {', '.join(z['needed'])}")
+          (out/"RE-WR3000-PUBLIC-ZEROTIER-CONTROL.md").write_text("\n".join(md)+"\n")
+          print(json.dumps(res,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RE-WR3000-PUBLIC-ZEROTIER-CONTROL
+          retention-days: 30
+          path: RE-WR3000-PUBLIC-ZT/RE-WR3000-PUBLIC-ZEROTIER-CONTROL.*
+      - shell: bash
+        run: |
+          mkdir -p RE-WR3000-PUBLIC-ZT-LATEST
+          cp RE-WR3000-PUBLIC-ZT/RE-WR3000-PUBLIC-ZEROTIER-CONTROL.* RE-WR3000-PUBLIC-ZT-LATEST/
+          git config user.name "OpenCudy RE Bot"
+          git config user.email "73985391+diablomike20@users.noreply.github.com"
+          git add RE-WR3000-PUBLIC-ZT-LATEST
+          git diff --cached --quiet && exit 0
+          git commit -m "RE: publish WR3000 public ZeroTier control"
+          git push origin HEAD:fu_7-cudy-cdn-index
