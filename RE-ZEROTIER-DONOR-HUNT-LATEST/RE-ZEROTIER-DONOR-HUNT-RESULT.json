@@ -16,12 +16,15 @@
     "https://www.cudy.com/cdn/shop/files/LT400Outdoor-R40-1.15.34-20230525-155951-flash.zip",
     "https://www.cudy.com/cdn/shop/files/LT400Outdoor-R40-2.1.9-20240522-110221-flash.zip",
     "https://www.cudy.com/cdn/shop/files/LT450-LT500-LT500DV2-R25-2.1.1-20240419-090237-flash.zip",
-    "https://www.cudy.com/cdn/shop/files/LT500Outdoor-R35-2.1.10-20240528-163250-flash.zip?v=11588229419371503142",
-    "https://www.cudy.com/cdn/shop/files/LT500Outdoor-R35-2.3.14-20250307-112700-flash.zip?v=16054444207564271487",
-    "https://www.cudy.com/cdn/shop/files/LT500Outdoor-R35-2.4.9-20250625-180244-flash.zip?v=17406700217740602979",
-    "https://www.cudy.com/cdn/shop/files/LT500V2-R25-1.15.28-20230410-094349-flash.zip"
+    "https://www.cudy.com/cdn/shop/files/LT450-LT500-LT500DV2-R25-2.1.1-20240419-090237-flash.zip?v=7493544000520006464",
+    "https://www.cudy.com/cdn/shop/files/LT500V2-R25-1.15.28-20230410-094349-flash.zip",
+    "https://www.cudy.com/cdn/shop/files/WR1200V2-R26-1.17.4-20240206-085058-flash.zip?v=8601534444854484133",
+    "https://www.cudy.com/cdn/shop/files/WR1200V2-R26-2.1.1-20240418-092852-flash.zip?v=12308873922506127795",
+    "https://www.cudy.com/cdn/shop/files/WR1200V2-R26-2.2.8-20241015-160718-flash.zip?v=17807784718097907424",
+    "https://www.cudy.com/cdn/shop/files/WR1200V2-R26-2.4.12-20250703-144919-flash.zip?v=18265745197659253807",
+    "https://www.cudy.com/cdn/shop/files/WR1200V2-R26-2.4.23-20251224-145945-flash.zip?v=10287497656812635253"
   ],
-  "unique_images_scanned": 10,
+  "unique_images_scanned": 12,
   "zerotier_builds_found": 1,
   "results": [
     {
@@ -83,9 +86,6 @@
         "official__LT400Outdoor-R40-1.15.34-20230525-155951-flash.zip :: LT400Outdoor-R40-1.15.34-20230525-155951-flash.bin",
         "official__LT400Outdoor-R40-2.1.9-20240522-110221-flash.zip :: LT400Outdoor-R40-2.1.9-20240522-110221-flash.bin",
         "official__LT450-LT500-LT500DV2-R25-2.1.1-20240419-090237-flash.zip :: LT450-LT500-LT500DV2-R25-2.1.1-20240419-090237-flash.bin",
-        "official__LT500Outdoor-R35-2.1.10-20240528-163250-flash.zip :: LT500Outdoor-R35-2.1.10-20240528-163250-flash.bin",
-        "official__LT500Outdoor-R35-2.3.14-20250307-112700-flash.zip :: LT500Outdoor-R35-2.3.14-20250307-112700-flash.bin",
-        "official__LT500Outdoor-R35-2.4.9-20250625-180244-flash.zip :: LT500Outdoor-R35-2.4.9-20250625-180244-flash.bin",
         "official__LT500V2-R25-1.15.28-20230410-094349-flash.zip :: LT500V2-R25-1.15.28-20230410-094349-flash.bin"
       ]
     }
