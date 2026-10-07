@@ -303,6 +303,10 @@ for i,u in enumerate(official[:90]):
     p=download_url(u,"official")
     if p:downloads.append(p)
 downloads += download_latest_fu7_artifacts()
+# Also consume firmware/artifact bundles pre-seeded by the workflow shell.
+for pre in sorted(DL.glob("*")):
+    if pre.is_file() and pre not in downloads:
+        downloads.append(pre)
 
 # expand every ZIP and gather likely firmware/raw images
 candidates=[]
