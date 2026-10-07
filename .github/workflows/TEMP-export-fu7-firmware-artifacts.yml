@@ -31,27 +31,36 @@ jobs:
           set -euo pipefail
           rm -rf MIGRATION-STAGING /tmp/fu7-artifacts
           mkdir -p /tmp/fu7-artifacts/{master,openwrt}
-          python3 - <<'PY'
-          import os, urllib.request
-          repo=os.environ["REPO"]; token=os.environ["GH_TOKEN"]
-          arts={
-            "master":11068611598,
-            "openwrt":11067574831,
+
+          curl -fsSL             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             -H "X-GitHub-Api-Version: 2022-11-28"             "https://api.github.com/repos/$REPO/actions/artifacts?per_page=100"             -o /tmp/fu7-artifacts/list.json
+
+          python3 - <<'PY' > /tmp/fu7-artifacts/ids.env
+          import json
+          d=json.load(open("/tmp/fu7-artifacts/list.json"))
+          want={
+            "MASTER_ID":"fu_7-CUDY-DEV-FIRMWARE-CLEAN-MASTER",
+            "OPENWRT_ID":"fu_7-CUDY-OPENWRT-INTERMEDIARY-CLEAN",
           }
-          for name,aid in arts.items():
-              url=f"https://api.github.com/repos/{repo}/actions/artifacts/{aid}/zip"
-              req=urllib.request.Request(url,headers={
-                "Authorization":f"Bearer {token}",
-                "Accept":"application/vnd.github+json",
-                "X-GitHub-Api-Version":"2022-11-28",
-                "User-Agent":"OpenCudy-Firmware-Migration",
-              })
-              with urllib.request.urlopen(req,timeout=180) as r:
-                  data=r.read()
-              p=f"/tmp/fu7-artifacts/{name}.zip"
-              open(p,"wb").write(data)
-              print(name,aid,len(data))
+          for key,name in want.items():
+              hits=[a for a in d.get("artifacts",[]) if a.get("name")==name and not a.get("expired")]
+              hits.sort(key=lambda a:a.get("created_at",""),reverse=True)
+              if not hits:
+                  raise SystemExit(f"artifact not found or expired: {name}")
+              a=hits[0]
+              print(f"{key}={a['id']}")
+              print(f"# {name} id={a['id']} size={a.get('size_in_bytes')} created={a.get('created_at')}")
           PY
+
+          cat /tmp/fu7-artifacts/ids.env
+          source <(grep '^[A-Z_]*=' /tmp/fu7-artifacts/ids.env)
+
+          for spec in "master:$MASTER_ID" "openwrt:$OPENWRT_ID"; do
+            name="${spec%%:*}"
+            id="${spec##*:}"
+            echo "DOWNLOADING $name artifact $id"
+            curl -fL --retry 2               -H "Authorization: Bearer $GH_TOKEN"               -H "Accept: application/vnd.github+json"               -H "X-GitHub-Api-Version: 2022-11-28"               "https://api.github.com/repos/$REPO/actions/artifacts/$id/zip"               -o "/tmp/fu7-artifacts/$name.zip"
+            ls -lh "/tmp/fu7-artifacts/$name.zip"
+          done
 
           unzip -q /tmp/fu7-artifacts/master.zip -d /tmp/fu7-artifacts/master
           unzip -q /tmp/fu7-artifacts/openwrt.zip -d /tmp/fu7-artifacts/openwrt
