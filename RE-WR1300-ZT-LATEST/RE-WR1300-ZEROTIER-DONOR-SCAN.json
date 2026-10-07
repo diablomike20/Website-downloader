@@ -1,0 +1,386 @@
+[
+  {
+    "tag": "WR1300V1-R10-1.13.6",
+    "url": "https://www.cudy.com/cdn/shop/files/WR1300-R10-1.13.6-20220314-112409-flash_1.zip",
+    "zip_size": 11501852,
+    "zip_sha256": "a3a41ef0f0c7548815f3afcc1e3fd230af5af270878812dd4f4474e94763790b",
+    "firmwares": [
+      {
+        "name": "WR1300-R10-1.13.6-20220314-112409-flash.bin",
+        "size": 11862171,
+        "sha256": "f7238c0c4aa34e3bb1e162467105fa422516ba09e30ce0c90266aee052aa66d2",
+        "squashfs_offset": "0x206fa1",
+        "zerotier": [
+          {
+            "size": 791080,
+            "sha256": "57c2f0f40039db7f6f91b24232be0120a9b75ce268c8da859ac6f85d48e7f4b2",
+            "needed": [
+              "libminiupnpc.so.17",
+              "libnatpmp.so.1",
+              "libstdc++.so.6",
+              "libgcc_s.so.1",
+              "libc.so"
+            ],
+            "libs": [
+              {
+                "name": "libminiupnpc.so.17",
+                "size": 37279,
+                "path": "usr/lib/libminiupnpc.so.17",
+                "R26_base": false
+              },
+              {
+                "name": "libnatpmp.so.1",
+                "size": 8331,
+                "path": "usr/lib/libnatpmp.so.1",
+                "R26_base": false
+              },
+              {
+                "name": "libstdc++.so.6",
+                "size": 1303867,
+                "path": "usr/lib/libstdc++.so.6",
+                "R26_base": false
+              },
+              {
+                "name": "libgcc_s.so.1",
+                "size": 76975,
+                "path": "lib/libgcc_s.so.1",
+                "R26_base": true
+              },
+              {
+                "name": "libc.so",
+                "size": 601967,
+                "path": "lib/libc.so",
+                "R26_base": true
+              }
+            ],
+            "extra_dependency_bytes": 1349477,
+            "estimated_R26_payload": 2140557,
+            "saving_vs_R25": 0,
+            "elf": "Class:                             ELF32 | Data:                              2's complement, little endian | Machine:                           MIPS R3000 | Flags:                             0x74001005, noreorder, cpic, o32, mips16, mips32r2"
+          }
+        ],
+        "release": "DISTRIB_ID='LEDE'\nDISTRIB_RELEASE='17.01.5'\nDISTRIB_REVISION='1.13.6'\nDISTRIB_CODENAME='openwrt'\nDISTRIB_TARGET='ramips/mt7621'\nDISTRIB_ARCH='mipsel_24kc'\nDISTRIB_DESCRIPTION='LEDE OpenWrt 17.01.5 1.13.6'\nDISTRIB_TAINTS='no-all busybox override' | 1.13.6-20220314-112409 | 1.13.6 | "
+      }
+    ]
+  },
+  {
+    "tag": "WR1300V2-R23-2.0.4",
+    "url": "https://www.cudy.com/cdn/shop/files/WR1300B-R23-2.0.4-20240206-090502-flash_1.zip",
+    "zip_size": 11362394,
+    "zip_sha256": "0e84e7ee13c5e08edee01fed6d162a42163e166dedda9eb23fecf735168c8869",
+    "firmwares": [
+      {
+        "name": "WR1300B-R23-2.0.4-20240206-090502-flash.bin",
+        "size": 11862170,
+        "sha256": "018d5e3019aee0b75cc543cf33e85c0961423d086751e1daa72345bd4687efb9",
+        "squashfs_offset": "0x331931",
+        "zerotier": [
+          {
+            "size": 791080,
+            "sha256": "c4b43b43ca8baaa5a53d036530c42dc93b4ec5bde68cd0c65c135d9f4d56cf0c",
+            "needed": [
+              "libminiupnpc.so.17",
+              "libnatpmp.so.1",
+              "libstdc++.so.6",
+              "libgcc_s.so.1",
+              "libc.so"
+            ],
+            "libs": [
+              {
+                "name": "libminiupnpc.so.17",
+                "size": 37279,
+                "path": "usr/lib/libminiupnpc.so.17",
+                "R26_base": false
+              },
+              {
+                "name": "libnatpmp.so.1",
+                "size": 8331,
+                "path": "usr/lib/libnatpmp.so.1",
+                "R26_base": false
+              },
+              {
+                "name": "libstdc++.so.6",
+                "size": 1303867,
+                "path": "usr/lib/libstdc++.so.6",
+                "R26_base": false
+              },
+              {
+                "name": "libgcc_s.so.1",
+                "size": 76975,
+                "path": "lib/libgcc_s.so.1",
+                "R26_base": true
+              },
+              {
+                "name": "libc.so",
+                "size": 601967,
+                "path": "lib/libc.so",
+                "R26_base": true
+              }
+            ],
+            "extra_dependency_bytes": 1349477,
+            "estimated_R26_payload": 2140557,
+            "saving_vs_R25": 0,
+            "elf": "Class:                             ELF32 | Data:                              2's complement, little endian | Machine:                           MIPS R3000 | Flags:                             0x74001005, noreorder, cpic, o32, mips16, mips32r2"
+          }
+        ],
+        "release": "DISTRIB_ID='LEDE'\nDISTRIB_RELEASE='17.01.5'\nDISTRIB_REVISION='2.0.4'\nDISTRIB_CODENAME='openwrt'\nDISTRIB_TARGET='ramips/mt7621'\nDISTRIB_ARCH='mipsel_24kc'\nDISTRIB_DESCRIPTION='LEDE OpenWrt 17.01.5 2.0.4'\nDISTRIB_TAINTS='no-all busybox override' | 2.0.4-20240206-090502 | 2.0.4 | "
+      }
+    ]
+  },
+  {
+    "tag": "WR1300V2-R23-2.2.6",
+    "url": "https://www.cudy.com/cdn/shop/files/WR1300B-R23-2.2.6-20240815-095128-flash.zip",
+    "zip_size": 11776647,
+    "zip_sha256": "1ac057c78fe6518d9c95805cd23bc2fb48b92c00784e2fd649330288b9af149b",
+    "firmwares": [
+      {
+        "name": "WR1300B-R23-2.2.6-20240815-095128-flash.bin",
+        "size": 12124314,
+        "sha256": "3d9c688d7ac88784b2c1f9059ad23965ff78849f0c001a12cb65049043f191e8",
+        "squashfs_offset": "0x33192a",
+        "zerotier": [
+          {
+            "size": 791080,
+            "sha256": "c4b43b43ca8baaa5a53d036530c42dc93b4ec5bde68cd0c65c135d9f4d56cf0c",
+            "needed": [
+              "libminiupnpc.so.17",
+              "libnatpmp.so.1",
+              "libstdc++.so.6",
+              "libgcc_s.so.1",
+              "libc.so"
+            ],
+            "libs": [
+              {
+                "name": "libminiupnpc.so.17",
+                "size": 37279,
+                "path": "usr/lib/libminiupnpc.so.17",
+                "R26_base": false
+              },
+              {
+                "name": "libnatpmp.so.1",
+                "size": 8331,
+                "path": "usr/lib/libnatpmp.so.1",
+                "R26_base": false
+              },
+              {
+                "name": "libstdc++.so.6",
+                "size": 1303867,
+                "path": "usr/lib/libstdc++.so.6",
+                "R26_base": false
+              },
+              {
+                "name": "libgcc_s.so.1",
+                "size": 76975,
+                "path": "lib/libgcc_s.so.1",
+                "R26_base": true
+              },
+              {
+                "name": "libc.so",
+                "size": 601967,
+                "path": "lib/libc.so",
+                "R26_base": true
+              }
+            ],
+            "extra_dependency_bytes": 1349477,
+            "estimated_R26_payload": 2140557,
+            "saving_vs_R25": 0,
+            "elf": "Class:                             ELF32 | Data:                              2's complement, little endian | Machine:                           MIPS R3000 | Flags:                             0x74001005, noreorder, cpic, o32, mips16, mips32r2"
+          }
+        ],
+        "release": "DISTRIB_ID='LEDE'\nDISTRIB_RELEASE='17.01.5'\nDISTRIB_REVISION='2.2.6'\nDISTRIB_CODENAME='openwrt'\nDISTRIB_TARGET='ramips/mt7621'\nDISTRIB_ARCH='mipsel_24kc'\nDISTRIB_DESCRIPTION='LEDE OpenWrt 17.01.5 2.2.6'\nDISTRIB_TAINTS='no-all busybox override' | 2.2.6-20240815-095128 | 2.2.6 | "
+      }
+    ]
+  },
+  {
+    "tag": "WR1300V2-R23-2.3.9",
+    "url": "https://www.cudy.com/cdn/shop/files/WR1300B-R23-2.3.9-20250208-115514-flash.zip",
+    "zip_size": 12077675,
+    "zip_sha256": "bd32f4368096956b776c32ced3a8ba6f75f4521dbf685935077774e86faa43bf",
+    "firmwares": [
+      {
+        "name": "WR1300B-R23-2.3.9-20250208-115514-flash.bin",
+        "size": 12386458,
+        "sha256": "b5a4d9290272d575c907a2cad49c66c16b03ee552ecdef32e8479a61df0b874e",
+        "squashfs_offset": "0x3318fc",
+        "zerotier": [
+          {
+            "size": 791080,
+            "sha256": "c4b43b43ca8baaa5a53d036530c42dc93b4ec5bde68cd0c65c135d9f4d56cf0c",
+            "needed": [
+              "libminiupnpc.so.17",
+              "libnatpmp.so.1",
+              "libstdc++.so.6",
+              "libgcc_s.so.1",
+              "libc.so"
+            ],
+            "libs": [
+              {
+                "name": "libminiupnpc.so.17",
+                "size": 37279,
+                "path": "usr/lib/libminiupnpc.so.17",
+                "R26_base": false
+              },
+              {
+                "name": "libnatpmp.so.1",
+                "size": 8331,
+                "path": "usr/lib/libnatpmp.so.1",
+                "R26_base": false
+              },
+              {
+                "name": "libstdc++.so.6",
+                "size": 1303867,
+                "path": "usr/lib/libstdc++.so.6",
+                "R26_base": false
+              },
+              {
+                "name": "libgcc_s.so.1",
+                "size": 76975,
+                "path": "lib/libgcc_s.so.1",
+                "R26_base": true
+              },
+              {
+                "name": "libc.so",
+                "size": 601967,
+                "path": "lib/libc.so",
+                "R26_base": true
+              }
+            ],
+            "extra_dependency_bytes": 1349477,
+            "estimated_R26_payload": 2140557,
+            "saving_vs_R25": 0,
+            "elf": "Class:                             ELF32 | Data:                              2's complement, little endian | Machine:                           MIPS R3000 | Flags:                             0x74001005, noreorder, cpic, o32, mips16, mips32r2"
+          }
+        ],
+        "release": "DISTRIB_ID='LEDE'\nDISTRIB_RELEASE='17.01.5'\nDISTRIB_REVISION='2.3.9'\nDISTRIB_CODENAME='openwrt'\nDISTRIB_TARGET='ramips/mt7621'\nDISTRIB_ARCH='mipsel_24kc'\nDISTRIB_DESCRIPTION='LEDE OpenWrt 17.01.5 2.3.9'\nDISTRIB_TAINTS='no-all busybox override' | 2.3.9-20250208-115514 | 2.3.9 | "
+      }
+    ]
+  },
+  {
+    "tag": "WR1300V2-R23-2.4.4",
+    "url": "https://www.cudy.com/cdn/shop/files/WR1300B-R23-2.4.4-20250507-170413-flash.zip",
+    "zip_size": 12086530,
+    "zip_sha256": "a3ebc5a6b72fe12dfe6d8f6a9325eadf5cf004881b1be97b688da869987b9505",
+    "firmwares": [
+      {
+        "name": "WR1300B-R23-2.4.4-20250507-170413-flash.bin",
+        "size": 12386458,
+        "sha256": "820c7d976c2e59f2ee2f5d6698450f7c67fa91bb44fd7c47ab6ed26676ded29d",
+        "squashfs_offset": "0x331a18",
+        "zerotier": [
+          {
+            "size": 791080,
+            "sha256": "c4b43b43ca8baaa5a53d036530c42dc93b4ec5bde68cd0c65c135d9f4d56cf0c",
+            "needed": [
+              "libminiupnpc.so.17",
+              "libnatpmp.so.1",
+              "libstdc++.so.6",
+              "libgcc_s.so.1",
+              "libc.so"
+            ],
+            "libs": [
+              {
+                "name": "libminiupnpc.so.17",
+                "size": 37279,
+                "path": "usr/lib/libminiupnpc.so.17",
+                "R26_base": false
+              },
+              {
+                "name": "libnatpmp.so.1",
+                "size": 8331,
+                "path": "usr/lib/libnatpmp.so.1",
+                "R26_base": false
+              },
+              {
+                "name": "libstdc++.so.6",
+                "size": 1303867,
+                "path": "usr/lib/libstdc++.so.6",
+                "R26_base": false
+              },
+              {
+                "name": "libgcc_s.so.1",
+                "size": 76975,
+                "path": "lib/libgcc_s.so.1",
+                "R26_base": true
+              },
+              {
+                "name": "libc.so",
+                "size": 601967,
+                "path": "lib/libc.so",
+                "R26_base": true
+              }
+            ],
+            "extra_dependency_bytes": 1349477,
+            "estimated_R26_payload": 2140557,
+            "saving_vs_R25": 0,
+            "elf": "Class:                             ELF32 | Data:                              2's complement, little endian | Machine:                           MIPS R3000 | Flags:                             0x74001005, noreorder, cpic, o32, mips16, mips32r2"
+          }
+        ],
+        "release": "DISTRIB_ID='LEDE'\nDISTRIB_RELEASE='17.01.5'\nDISTRIB_REVISION='2.4.4'\nDISTRIB_CODENAME='openwrt'\nDISTRIB_TARGET='ramips/mt7621'\nDISTRIB_ARCH='mipsel_24kc'\nDISTRIB_DESCRIPTION='LEDE OpenWrt 17.01.5 2.4.4'\nDISTRIB_TAINTS='no-all busybox override' | 2.4.4-20250507-170413 | 2.4.4 | "
+      }
+    ]
+  },
+  {
+    "tag": "WR1300V2-R23-2.5.25",
+    "url": "https://www.cudy.com/cdn/shop/files/WR1300B-R23-2.5.25-20260805-113408-flash.zip",
+    "zip_size": 12754308,
+    "zip_sha256": "b9640df787be69897f7dbc8f9700cca7139fc2f5371be81540609fb1ab46ef06",
+    "firmwares": [
+      {
+        "name": "WR1300B-R23-2.5.25-20260805-113408-flash.bin",
+        "size": 13172891,
+        "sha256": "fe22fbfb3cc6c71234c1ccc5483722042577eea35455974e1d8e22db0ed020e6",
+        "squashfs_offset": "0x331802",
+        "zerotier": [
+          {
+            "size": 791080,
+            "sha256": "c4b43b43ca8baaa5a53d036530c42dc93b4ec5bde68cd0c65c135d9f4d56cf0c",
+            "needed": [
+              "libminiupnpc.so.17",
+              "libnatpmp.so.1",
+              "libstdc++.so.6",
+              "libgcc_s.so.1",
+              "libc.so"
+            ],
+            "libs": [
+              {
+                "name": "libminiupnpc.so.17",
+                "size": 37279,
+                "path": "usr/lib/libminiupnpc.so.17",
+                "R26_base": false
+              },
+              {
+                "name": "libnatpmp.so.1",
+                "size": 8331,
+                "path": "usr/lib/libnatpmp.so.1",
+                "R26_base": false
+              },
+              {
+                "name": "libstdc++.so.6",
+                "size": 1303867,
+                "path": "usr/lib/libstdc++.so.6",
+                "R26_base": false
+              },
+              {
+                "name": "libgcc_s.so.1",
+                "size": 76975,
+                "path": "lib/libgcc_s.so.1",
+                "R26_base": true
+              },
+              {
+                "name": "libc.so",
+                "size": 601967,
+                "path": "lib/libc.so",
+                "R26_base": true
+              }
+            ],
+            "extra_dependency_bytes": 1349477,
+            "estimated_R26_payload": 2140557,
+            "saving_vs_R25": 0,
+            "elf": "Class:                             ELF32 | Data:                              2's complement, little endian | Machine:                           MIPS R3000 | Flags:                             0x74001005, noreorder, cpic, o32, mips16, mips32r2"
+          }
+        ],
+        "release": "DISTRIB_ID='LEDE'\nDISTRIB_RELEASE='17.01.5'\nDISTRIB_REVISION='2.5.25'\nDISTRIB_CODENAME='openwrt'\nDISTRIB_TARGET='ramips/mt7621'\nDISTRIB_ARCH='mipsel_24kc'\nDISTRIB_DESCRIPTION='LEDE OpenWrt 17.01.5 2.5.25'\nDISTRIB_TAINTS='no-all busybox override' | 2.5.25-20260805-113408 | 2.5.25 | "
+      }
+    ]
+  }
+]
