@@ -69,7 +69,7 @@ def sha(p):
 def safe(s): return re.sub(r'[^A-Za-z0-9._()+ -]+','_',s)[:220]
 
 def collect_urls():
-    urls=set(); log=[]
+    urls=set(EXACT_STABLE_URLS); log=[]
     for page in PAGES:
         try:t=fetch(page,60).decode("utf-8","replace")
         except Exception as e:
